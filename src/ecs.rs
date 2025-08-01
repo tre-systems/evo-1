@@ -1,7 +1,6 @@
 use hecs::World;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 // ============================================================================
 // COMPONENTS
@@ -121,6 +120,78 @@ pub struct AgentTag;
 pub struct ResourceTag;
 
 // ============================================================================
+// SPATIAL PARTITIONING
+// ============================================================================
+
+#[derive(Clone, Debug)]
+pub struct SpatialGrid {
+    pub cell_size: f64,
+    pub width: usize,
+    pub height: usize,
+    pub cells: Vec<Vec<Vec<hecs::Entity>>>,
+}
+
+impl SpatialGrid {
+    pub fn new(canvas_width: f64, canvas_height: f64, cell_size: f64) -> Self {
+        let width = (canvas_width / cell_size).ceil() as usize;
+        let height = (canvas_height / cell_size).ceil() as usize;
+        let cells = vec![vec![Vec::new(); height]; width];
+
+        Self {
+            cell_size,
+            width,
+            height,
+            cells,
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for row in &mut self.cells {
+            for cell in row {
+                cell.clear();
+            }
+        }
+    }
+
+    pub fn get_cell(&self, x: f64, y: f64) -> (usize, usize) {
+        let grid_x = (x / self.cell_size).floor() as usize;
+        let grid_y = (y / self.cell_size).floor() as usize;
+        (grid_x.min(self.width - 1), grid_y.min(self.height - 1))
+    }
+
+    pub fn add_entity(&mut self, entity: hecs::Entity, x: f64, y: f64) {
+        let (grid_x, grid_y) = self.get_cell(x, y);
+        if grid_x < self.width && grid_y < self.height {
+            self.cells[grid_x][grid_y].push(entity);
+        }
+    }
+
+    pub fn get_nearby_entities(&self, x: f64, y: f64, radius: f64) -> Vec<hecs::Entity> {
+        let mut entities = Vec::new();
+        let (center_x, center_y) = self.get_cell(x, y);
+        let cell_radius = (radius / self.cell_size).ceil() as i32;
+
+        for dx in -cell_radius..=cell_radius {
+            for dy in -cell_radius..=cell_radius {
+                let check_x = center_x as i32 + dx;
+                let check_y = center_y as i32 + dy;
+
+                if check_x >= 0
+                    && check_x < self.width as i32
+                    && check_y >= 0
+                    && check_y < self.height as i32
+                {
+                    let cell_entities = &self.cells[check_x as usize][check_y as usize];
+                    entities.extend(cell_entities.iter().cloned());
+                }
+            }
+        }
+
+        entities
+    }
+}
+
+// ============================================================================
 // WORLD MANAGEMENT
 // ============================================================================
 
@@ -131,11 +202,13 @@ pub struct EcsWorld {
     pub max_agents: usize,
     pub max_resources: usize,
     pub resource_spawn_timer: f64,
+    pub spatial_grid: SpatialGrid,
 }
 
 impl EcsWorld {
     pub fn new(canvas_width: f64, canvas_height: f64) -> Self {
         let world = World::new();
+        let spatial_grid = SpatialGrid::new(canvas_width, canvas_height, 50.0);
 
         let mut ecs_world = Self {
             world,
@@ -144,6 +217,7 @@ impl EcsWorld {
             max_agents: 10000,
             max_resources: 1500,
             resource_spawn_timer: 0.0,
+            spatial_grid,
         };
 
         // Spawn initial population
@@ -157,6 +231,9 @@ impl EcsWorld {
 
         // Update resources
         self.update_resources(delta_time);
+
+        // Update spatial grid
+        self.update_spatial_grid();
 
         // Update agents
         self.update_agents(delta_time);
@@ -175,121 +252,74 @@ impl EcsWorld {
         }
     }
 
+    pub fn update_spatial_grid(&mut self) {
+        self.spatial_grid.clear();
+
+        // Add agents to spatial grid
+        for (entity, pos) in self.world.query::<&Position>().iter() {
+            if self.world.get::<&AgentTag>(entity).is_ok() {
+                self.spatial_grid.add_entity(entity, pos.x, pos.y);
+            }
+        }
+    }
+
     fn update_resources(&mut self, delta_time: f64) {
-        // Sequential processing for now
+        // Use query_mut for resources that need updating
         for (_, resource) in self.world.query_mut::<&mut Resource>() {
             resource.update(delta_time);
         }
     }
 
     fn update_agents(&mut self, delta_time: f64) {
-        // Get all resources for agent decision making
+        let canvas_width = self.canvas_width;
+        let canvas_height = self.canvas_height;
+
+        // First, collect all resources for efficient lookup
         let resources: Vec<_> = self
             .world
             .query::<(&Position, &Resource)>()
             .iter()
+            .filter(|(entity, _)| self.world.get::<&ResourceTag>(*entity).is_ok())
             .map(|(_, (pos, res))| (pos.x, pos.y, res.clone()))
             .collect();
 
-        let resources = Arc::new(resources);
-        let canvas_width = self.canvas_width;
-        let canvas_height = self.canvas_height;
+        // Collect agent entities that need updating
+        let agent_entities: Vec<_> = self
+            .world
+            .query::<(&Position, &Velocity, &Energy, &Age, &AgentState, &Genes)>()
+            .iter()
+            .filter(|(entity, _)| self.world.get::<&AgentTag>(*entity).is_ok())
+            .map(|(entity, _)| entity)
+            .collect();
 
-        // Sequential processing for now
-        for (_, (pos, vel, energy, age, state, genes)) in self.world.query_mut::<(
-            &mut Position,
-            &mut Velocity,
-            &mut Energy,
-            &mut Age,
-            &mut AgentState,
-            &Genes,
-        )>() {
-            // Inline the update logic to avoid borrowing issues
-            age.value += delta_time;
-
-            // Energy consumption
-            let base_energy_cost = (genes.size * 0.05 + genes.speed * 0.02) * delta_time;
-            let metabolism_factor = genes.metabolism;
-            let environmental_factor = 1.0 + (pos.x / canvas_width + pos.y / canvas_height) * 0.001;
-            let total_energy_cost = base_energy_cost * metabolism_factor * environmental_factor;
-            energy.current -= total_energy_cost / genes.energy_efficiency;
-
-            // Check for death
-            if energy.current <= 0.0 || age.value > 200.0 {
-                continue;
-            }
-
-            // Update behavior - inline to avoid borrowing issues
-            // Simple seeking behavior
-            let mut best_target = None;
-            let mut best_score = f64::NEG_INFINITY;
-
-            for (rx, ry, resource) in resources.iter() {
-                if resource.is_available() {
-                    let distance = ((pos.x - rx).powi(2) + (pos.y - ry).powi(2)).sqrt();
-                    if distance <= genes.sense_range {
-                        let score = resource.energy / (distance + 1.0);
-                        if score > best_score {
-                            best_score = score;
-                            best_target = Some((*rx, *ry));
-                        }
-                    }
-                }
-            }
-
-            if let Some((tx, ty)) = best_target {
-                state.target_x = Some(tx);
-                state.target_y = Some(ty);
-                state.state = AgentStateEnum::Hunting;
-            } else {
-                // Random movement
-                let mut rng = thread_rng();
-                let angle = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
-                vel.dx = angle.cos() * genes.speed;
-                vel.dy = angle.sin() * genes.speed;
-            }
-
-            // Move agent - inline to avoid borrowing issues
-            // Apply movement
-            pos.x += vel.dx * delta_time;
-            pos.y += vel.dy * delta_time;
-
-            // Boundary wrapping
-            if pos.x < 0.0 {
-                pos.x = canvas_width;
-            }
-            if pos.x > canvas_width {
-                pos.x = 0.0;
-            }
-            if pos.y < 0.0 {
-                pos.y = canvas_height;
-            }
-            if pos.y > canvas_height {
-                pos.y = 0.0;
-            }
-
-            // Normalize direction vector
-            let length = (vel.dx * vel.dx + vel.dy * vel.dy).sqrt();
-            if length > 0.0 {
-                vel.dx /= length;
-                vel.dy /= length;
-            }
+        // Update each agent individually to avoid borrowing conflicts
+        for entity in agent_entities {
+            self.update_single_agent(entity, delta_time, &resources, canvas_width, canvas_height);
         }
     }
 
-    fn update_agent(
-        &self,
-        pos: &mut Position,
-        vel: &mut Velocity,
-        energy: &mut Energy,
-        age: &mut Age,
-        state: &mut AgentState,
-        genes: &Genes,
-        resources: &Arc<Vec<(f64, f64, Resource)>>,
+    pub fn update_single_agent(
+        &mut self,
+        entity: hecs::Entity,
         delta_time: f64,
+        resources: &[(f64, f64, Resource)],
         canvas_width: f64,
         canvas_height: f64,
     ) {
+        // Get mutable references to agent components
+        let (pos, vel, energy, age, state, genes) = self
+            .world
+            .query_one_mut::<(
+                &mut Position,
+                &mut Velocity,
+                &mut Energy,
+                &mut Age,
+                &mut AgentState,
+                &Genes,
+            )>(entity)
+            .unwrap();
+
+        // Update age
         age.value += delta_time;
 
         // Energy consumption
@@ -299,34 +329,17 @@ impl EcsWorld {
         let total_energy_cost = base_energy_cost * metabolism_factor * environmental_factor;
         energy.current -= total_energy_cost / genes.energy_efficiency;
 
-        // Check for death
-        if energy.current <= 0.0 || age.value > 200.0 {
-            // Mark for death - this will be handled by the death system
-            return;
-        }
-
-        // Update behavior
-        self.update_behavior(pos, vel, state, genes, resources);
-
-        // Move agent
-        self.move_agent(pos, vel, delta_time, canvas_width, canvas_height);
-    }
-
-    fn update_behavior(
-        &self,
-        pos: &Position,
-        vel: &mut Velocity,
-        state: &mut AgentState,
-        genes: &Genes,
-        resources: &Arc<Vec<(f64, f64, Resource)>>,
-    ) {
-        // Simple seeking behavior
+        // Find nearby resources using spatial grid
+        let _nearby_entities =
+            self.spatial_grid
+                .get_nearby_entities(pos.x, pos.y, genes.sense_range);
         let mut best_target = None;
         let mut best_score = f64::NEG_INFINITY;
 
-        for (rx, ry, resource) in resources.iter() {
+        // Use the pre-collected resources for efficiency
+        for (rx, ry, resource) in resources {
             if resource.is_available() {
-                let distance = ((pos.x - rx).powi(2) + (pos.y - ry).powi(2)).sqrt();
+                let distance = ((pos.x - *rx).powi(2) + (pos.y - *ry).powi(2)).sqrt();
                 if distance <= genes.sense_range {
                     let score = resource.energy / (distance + 1.0);
                     if score > best_score {
@@ -337,10 +350,20 @@ impl EcsWorld {
             }
         }
 
+        // Update behavior
         if let Some((tx, ty)) = best_target {
             state.target_x = Some(tx);
             state.target_y = Some(ty);
             state.state = AgentStateEnum::Hunting;
+
+            // Move towards target
+            let dx = tx - pos.x;
+            let dy = ty - pos.y;
+            let distance = (dx * dx + dy * dy).sqrt();
+            if distance > 0.0 {
+                vel.dx = (dx / distance) * genes.speed;
+                vel.dy = (dy / distance) * genes.speed;
+            }
         } else {
             // Random movement
             let mut rng = thread_rng();
@@ -348,17 +371,8 @@ impl EcsWorld {
             vel.dx = angle.cos() * genes.speed;
             vel.dy = angle.sin() * genes.speed;
         }
-    }
 
-    fn move_agent(
-        &self,
-        pos: &mut Position,
-        vel: &mut Velocity,
-        delta_time: f64,
-        canvas_width: f64,
-        canvas_height: f64,
-    ) {
-        // Apply movement
+        // Move agent
         pos.x += vel.dx * delta_time;
         pos.y += vel.dy * delta_time;
 
@@ -375,40 +389,93 @@ impl EcsWorld {
         if pos.y > canvas_height {
             pos.y = 0.0;
         }
-
-        // Normalize direction vector
-        let length = (vel.dx * vel.dx + vel.dy * vel.dy).sqrt();
-        if length > 0.0 {
-            vel.dx /= length;
-            vel.dy /= length;
-        }
     }
 
-    fn handle_death(&mut self) {
-        let mut to_remove = Vec::new();
+    pub fn handle_death(&mut self) {
+        // Use a more efficient approach - collect entities to despawn
+        let mut to_despawn = Vec::new();
 
         for (entity, (energy, age)) in self.world.query::<(&Energy, &Age)>().iter() {
             if energy.current <= 0.0 || age.value > 200.0 {
-                to_remove.push(entity);
+                to_despawn.push(entity);
             }
         }
 
-        // Remove dead entities
-        for entity in to_remove {
+        // Despawn dead entities
+        for entity in to_despawn {
             self.world.despawn(entity).ok();
         }
     }
 
-    fn handle_reproduction(&mut self) {
-        // Simplified reproduction - just spawn new agents occasionally
-        let mut rng = thread_rng();
-        let agent_count = self.get_agent_count();
+    pub fn handle_reproduction(&mut self) {
+        // Find all agents that can reproduce
+        let mut potential_parents: Vec<_> = self.world
+            .query::<(&crate::ecs::Position, &crate::ecs::Energy, &crate::ecs::Age, &crate::ecs::AgentState, &crate::ecs::Genes)>()
+            .iter()
+            .filter(|(entity, _)| self.world.get::<&crate::ecs::AgentTag>(*entity).is_ok())
+            .filter(|(_, (_, energy, age, state, _))| {
+                self.can_reproduce(energy, age, state)
+            })
+            .map(|(entity, (pos, energy, age, state, genes))| {
+                (entity, pos.clone(), energy.clone(), age.clone(), state.clone(), genes.clone())
+            })
+            .collect();
 
-        if agent_count < self.max_agents && rng.gen::<f64>() < 0.1 {
-            let x = rng.gen_range(0.0..self.canvas_width);
-            let y = rng.gen_range(0.0..self.canvas_height);
-            let genes = self.generate_random_genes();
-            self.spawn_agent(x, y, genes, 0);
+        // Early return if not enough potential parents
+        if potential_parents.len() < 2 {
+            return;
+        }
+
+        // Shuffle to randomize reproduction order
+        let mut rng = thread_rng();
+        potential_parents.shuffle(&mut rng);
+
+        // Try to pair agents for reproduction
+        let mut i = 0;
+        while i < potential_parents.len() - 1 && self.get_agent_count() < self.max_agents {
+            let (entity1, pos1, energy1, age1, state1, genes1) = &potential_parents[i];
+            let (entity2, pos2, energy2, age2, state2, genes2) = &potential_parents[i + 1];
+
+            // Check if agents are close enough to reproduce
+            let distance = self.distance(pos1, pos2);
+            if distance < 50.0 { // Reproduction radius
+                // Calculate reproduction probability based on energy and age
+                let energy_factor = (energy1.current / energy1.max).min(energy2.current / energy2.max);
+                let age_factor = (age1.value / 10.0).min(age2.value / 10.0).min(1.0);
+                let reproduction_chance = energy_factor * age_factor * 0.1; // 10% base chance
+
+                if rng.gen::<f64>() < reproduction_chance {
+                    // Create offspring with inherited genes
+                    let offspring_genes = self.inherit_genes(genes1, genes2);
+                    
+                    // Add some mutation
+                    let mutated_genes = self.mutate_genes(&offspring_genes);
+                    
+                    // Spawn offspring between parents
+                    let offspring_x = (pos1.x + pos2.x) / 2.0;
+                    let offspring_y = (pos1.y + pos2.y) / 2.0;
+                    let offspring_generation = state1.generation.max(state2.generation) + 1;
+                    
+                    self.spawn_agent(offspring_x, offspring_y, mutated_genes, offspring_generation);
+                    
+                    // Update parent reproduction timers
+                    if let Ok(mut state1_mut) = self.world.get::<&mut crate::ecs::AgentState>(*entity1) {
+                        state1_mut.last_reproduction = age1.value;
+                    }
+                    if let Ok(mut state2_mut) = self.world.get::<&mut crate::ecs::AgentState>(*entity2) {
+                        state2_mut.last_reproduction = age2.value;
+                    }
+                    
+                    // Consume some energy from parents
+                    if let Ok(mut energy1_mut) = self.world.get::<&mut crate::ecs::Energy>(*entity1) {
+                        energy1_mut.current = (energy1_mut.current - 20.0).max(10.0);
+                    }
+                    if let Ok(mut energy2_mut) = self.world.get::<&mut crate::ecs::Energy>(*entity2) {
+                        energy2_mut.current = (energy2_mut.current - 20.0).max(10.0);
+                    }
+                }
+            }
+            i += 2; // Skip both parents
         }
     }
 
@@ -495,7 +562,7 @@ impl EcsWorld {
         ));
     }
 
-    fn spawn_resource(&mut self) {
+    pub fn spawn_resource(&mut self) {
         let mut rng = thread_rng();
         let x = rng.gen_range(0.0..self.canvas_width);
         let y = rng.gen_range(0.0..self.canvas_height);
@@ -567,6 +634,32 @@ impl EcsWorld {
         }
     }
 
+    fn mutate_genes(&self, genes: &Genes) -> Genes {
+        let mut rng = thread_rng();
+        let mutation_strength = 0.1; // 10% mutation strength
+        
+        Genes {
+            speed: genes.speed * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            sense_range: genes.sense_range * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            size: genes.size * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            energy_efficiency: genes.energy_efficiency * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            reproduction_threshold: genes.reproduction_threshold * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            mutation_rate: genes.mutation_rate * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            aggression: genes.aggression * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            color_hue: genes.color_hue * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            is_predator: genes.is_predator * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            hunting_speed: genes.hunting_speed * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            attack_power: genes.attack_power * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            defense: genes.defense * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            stealth: genes.stealth * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            pack_mentality: genes.pack_mentality * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            territory_size: genes.territory_size * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            metabolism: genes.metabolism * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            intelligence: genes.intelligence * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            stamina: genes.stamina * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+        }
+    }
+
     pub fn get_agent_count(&self) -> usize {
         self.world.query::<&AgentTag>().iter().count()
     }
@@ -608,6 +701,7 @@ impl EcsWorld {
     pub fn reset(&mut self) {
         self.world = World::new();
         self.resource_spawn_timer = 0.0;
+        self.spatial_grid.clear();
         self.spawn_initial_population();
     }
 
@@ -623,6 +717,7 @@ impl EcsWorld {
                 &Size,
             )>()
             .iter()
+            .filter(|(entity, _)| self.world.get::<&AgentTag>(*entity).is_ok())
             .map(|(_, (pos, vel, energy, age, state, genes, size))| {
                 (
                     pos.clone(),
@@ -641,6 +736,7 @@ impl EcsWorld {
         self.world
             .query::<(&Position, &Resource, &Size)>()
             .iter()
+            .filter(|(entity, _)| self.world.get::<&ResourceTag>(*entity).is_ok())
             .map(|(_, (pos, resource, size))| (pos.clone(), resource.clone(), size.clone()))
             .collect()
     }

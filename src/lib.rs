@@ -1,285 +1,283 @@
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+// Core simulation modules (shared between headless and web)
 pub mod agent;
 pub mod ecs;
 pub mod genes;
-pub mod headless_simulation;
 pub mod resource;
-pub mod simulation_core;
-pub mod web_simulation;
-pub mod webgl_renderer;
+pub mod simulation;
 
+// Rendering modules (web only)
+#[cfg(target_arch = "wasm32")]
+pub mod renderer;
+
+// Headless simulation (native only)
+#[cfg(not(target_arch = "wasm32"))]
+pub mod headless;
+
+// ============================================================================
+// CORE SIMULATION (Shared between headless and web)
+// ============================================================================
+
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub struct BattleSimulation {
-    web_simulation: web_simulation::WebSimulation,
+    simulation: simulation::Simulation,
+    #[wasm_bindgen(skip)]
+    renderer: Option<renderer::WebRenderer>,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 impl BattleSimulation {
     #[wasm_bindgen(constructor)]
-    pub fn new(canvas_id: &str) -> Result<BattleSimulation, JsValue> {
+    pub fn new(canvas_id: Option<String>) -> Result<BattleSimulation, JsValue> {
         console_error_panic_hook::set_once();
 
-        let web_simulation = web_simulation::WebSimulation::new(canvas_id)?;
+        let simulation = simulation::Simulation::new();
 
-        Ok(BattleSimulation { web_simulation })
+        let renderer = if let Some(canvas_id) = canvas_id {
+            Some(renderer::WebRenderer::new(&canvas_id)?)
+        } else {
+            None
+        };
+
+        Ok(BattleSimulation {
+            simulation,
+            renderer,
+        })
     }
 
-    pub fn start(&mut self) {
-        self.web_simulation.start();
-    }
+    pub fn update(&mut self) {
+        self.simulation.update();
 
-    pub fn stop(&mut self) {
-        self.web_simulation.stop();
-    }
-
-    pub fn step(&mut self) {
-        self.web_simulation.step();
+        if let Some(renderer) = &mut self.renderer {
+            renderer.render(&self.simulation);
+        }
     }
 
     pub fn get_stats(&self) -> JsValue {
-        self.web_simulation.get_stats()
-    }
-
-    pub fn get_rendering_mode(&self) -> String {
-        self.web_simulation.get_rendering_mode()
-    }
-
-    pub fn is_rayon_available(&self) -> bool {
-        self.web_simulation.is_rayon_available()
-    }
-
-    pub fn set_rayon_initialized(&self, initialized: bool) {
-        self.web_simulation.set_rayon_initialized(initialized);
-    }
-
-    pub fn force_webgl(&mut self) -> bool {
-        self.web_simulation.force_webgl()
+        serde_wasm_bindgen::to_value(&self.simulation.get_stats()).unwrap()
     }
 
     pub fn add_agent(&mut self, x: f64, y: f64) {
-        self.web_simulation.add_agent(x, y);
+        self.simulation.add_agent(x, y);
     }
 
     pub fn add_resource(&mut self, x: f64, y: f64) {
-        self.web_simulation.add_resource(x, y);
+        self.simulation.add_resource(x, y);
     }
 
     pub fn reset(&mut self) {
-        self.web_simulation.reset();
-    }
-
-    pub fn animate(&mut self) {
-        self.web_simulation.animate();
+        self.simulation.reset();
     }
 }
 
-#[wasm_bindgen]
-pub fn init_panic_hook() {
-    console_error_panic_hook::set_once();
-}
+// ============================================================================
+// PARALLEL PROCESSING (WASM with wasm-bindgen-rayon, native with rayon)
+// ============================================================================
 
-#[wasm_bindgen]
-// Removed init_rayon_pool function - using ParallelProcessor instead
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub struct ParallelProcessor {
     initialized: bool,
     worker_count: usize,
-    #[wasm_bindgen(skip)]
-    _closure: Option<Closure<dyn FnMut(JsValue)>>,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 impl ParallelProcessor {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        let worker_count = 1;
+        let worker_count = get_optimal_worker_count();
+
         Self {
             initialized: false,
             worker_count,
-            _closure: None,
         }
     }
 
     pub fn initialize(&mut self) -> js_sys::Promise {
         #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
         {
-            #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
+            use wasm_bindgen::closure::Closure;
             use wasm_bindgen_rayon::init_thread_pool;
 
             web_sys::console::log_1(
                 &format!(
-                    "Starting Rayon initialization with {} workers",
+                    "Initializing WASM thread pool with {} workers",
                     self.worker_count
                 )
                 .into(),
             );
 
-            // Check if already initialized
-            if self.initialized {
-                web_sys::console::warn_1(&"Thread pool already initialized".into());
-                // ecs_simulation::EcsSimulation::set_rayon_initialized(true); // This line was removed
-                return js_sys::Promise::resolve(&wasm_bindgen::JsValue::NULL);
-            }
-
-            {
-                let worker_count = self.worker_count;
-                let closure = Closure::wrap(Box::new(move |result: JsValue| {
+            let worker_count = self.worker_count;
+            let closure = Closure::wrap(Box::new(move |result: JsValue| match result.as_f64() {
+                Some(_) => {
                     web_sys::console::log_1(
-                        &format!("Rayon initialization callback received: {:?}", result).into(),
+                        &format!("WASM thread pool initialized with {} workers", worker_count)
+                            .into(),
                     );
-                    match result.as_f64() {
-                        Some(_) => {
-                            // ecs_simulation::EcsSimulation::set_rayon_initialized(true); // This line was removed
-                            web_sys::console::log_1(
-                                &format!("Thread pool initialized with {} workers", worker_count)
-                                    .into(),
-                            );
-                        }
-                        None => {
-                            // ecs_simulation::EcsSimulation::set_rayon_initialized(false); // This line was removed
-                            web_sys::console::log_1(
-                                &format!("Failed to initialize thread pool - SharedArrayBuffer may not be available").into(),
-                            );
-                        }
-                    }
-                }) as Box<dyn FnMut(JsValue)>);
+                    simulation::set_rayon_available(true);
+                }
+                None => {
+                    web_sys::console::warn_1(&"Failed to initialize WASM thread pool".into());
+                    simulation::set_rayon_available(false);
+                }
+            }) as Box<dyn FnMut(JsValue)>);
 
-                // Store the closure in the struct to prevent it from being dropped
-                self._closure = Some(closure);
-
-                // Get a reference to the stored closure
-                let closure_ref = self._closure.as_ref().unwrap();
-
-                // Create the promise with the stored closure
-                let promise = init_thread_pool(self.worker_count).then(closure_ref);
-
-                // Mark as initialized to prevent recursive calls
-                self.initialized = true;
-
-                promise
-            }
-        }
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
-        {
-            // For non-WASM targets, simulate initialization
             self.initialized = true;
-            let promise = js_sys::Promise::resolve(&wasm_bindgen::JsValue::NULL);
-            promise
-        }
-    }
-
-    pub fn initialize_fallback(&mut self) -> js_sys::Promise {
-        // Fallback initialization that works without SharedArrayBuffer
-        web_sys::console::warn_1(&"Using fallback mode - SharedArrayBuffer not available".into());
-        self.initialized = true;
-        // ecs_simulation::EcsSimulation::set_rayon_initialized(false); // This line was removed
-        let promise = js_sys::Promise::resolve(&wasm_bindgen::JsValue::NULL);
-        promise
-    }
-
-    pub fn parallel_sum(&self, data: Vec<f64>) -> f64 {
-        if !self.initialized {
-            web_sys::console::warn_1(&"Thread pool not initialized, using sequential".into());
-            return data.iter().sum();
-        }
-
-        #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().sum()
+            init_thread_pool(self.worker_count).then(&closure)
         }
 
         #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
         {
-            use rayon::prelude::*;
-            data.par_iter().sum()
+            // Native target - initialize rayon thread pool
+            use rayon::ThreadPoolBuilder;
+
+            match ThreadPoolBuilder::new()
+                .num_threads(self.worker_count)
+                .build_global()
+            {
+                Ok(_) => {
+                    simulation::set_rayon_available(true);
+                    web_sys::console::log_1(
+                        &format!(
+                            "Native thread pool initialized with {} workers",
+                            self.worker_count
+                        )
+                        .into(),
+                    );
+                }
+                Err(_) => {
+                    simulation::set_rayon_available(false);
+                    web_sys::console::warn_1(&"Failed to initialize native thread pool".into());
+                }
+            }
+
+            self.initialized = true;
+            js_sys::Promise::resolve(&JsValue::NULL)
         }
     }
 
-    pub fn parallel_map(&self, data: Vec<f64>) -> Vec<f64> {
-        if !self.initialized {
-            return data.iter().map(|x| x * 2.0).collect();
-        }
-
-        #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().map(|x| x * 2.0).collect()
-        }
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().map(|x| x * 2.0).collect()
-        }
-    }
-
-    pub fn complex_parallel_operation(&self, data: Vec<f64>) -> f64 {
-        if !self.initialized {
-            return data.iter().map(|x| x.powi(2)).sum::<f64>().sqrt();
-        }
-
-        #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().map(|x| x.powi(2)).sum::<f64>().sqrt()
-        }
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().map(|x| x.powi(2)).sum::<f64>().sqrt()
-        }
+    pub fn is_initialized(&self) -> bool {
+        self.initialized
     }
 
     pub fn get_worker_count(&self) -> usize {
         self.worker_count
     }
 
-    pub fn is_initialized(&self) -> bool {
-        self.initialized
+    pub fn is_rayon_available(&self) -> bool {
+        simulation::is_rayon_available()
     }
 }
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+fn get_optimal_worker_count() -> usize {
+    #[cfg(target_arch = "wasm32")]
+    {
+        // Simple fallback for WASM - use 4 workers
+        4
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
+// ============================================================================
+// HEADLESS SIMULATION (Native only)
+// ============================================================================
+
+#[cfg(not(target_arch = "wasm32"))]
+pub struct HeadlessSimulation {
+    simulation: simulation::Simulation,
+    config: headless::HeadlessConfig,
+    diagnostics: headless::SimulationDiagnostics,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl HeadlessSimulation {
+    pub fn new(config: headless::HeadlessConfig) -> Self {
+        let mut simulation = simulation::Simulation::new();
+
+        // Spawn initial population
+        for _ in 0..config.initial_agents {
+            let x = rand::random::<f64>() * 1000.0;
+            let y = rand::random::<f64>() * 800.0;
+            simulation.add_agent(x, y);
+        }
+
+        for _ in 0..config.initial_resources {
+            let x = rand::random::<f64>() * 1000.0;
+            let y = rand::random::<f64>() * 800.0;
+            simulation.add_resource(x, y);
+        }
+
+        Self {
+            simulation,
+            config,
+            diagnostics: headless::SimulationDiagnostics::default(),
+        }
+    }
+
+    pub fn run(&mut self) -> headless::SimulationDiagnostics {
+        let mut headless_sim = headless::HeadlessSimulation::new(self.config.clone());
+        headless_sim.run()
+    }
+
+    pub fn get_current_stats(&self) -> simulation::SimulationStats {
+        self.simulation.get_stats()
+    }
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_headless_simulation_v2() {
-        use crate::headless_simulation::{HeadlessSimulationConfig, HeadlessSimulationV2};
+    fn test_simulation_basic() {
+        let mut sim = simulation::Simulation::new();
 
-        println!("=== Testing Headless Simulation V2 ===");
+        // Add some agents and resources
+        sim.add_agent(100.0, 100.0);
+        sim.add_agent(200.0, 200.0);
+        sim.add_resource(150.0, 150.0);
 
-        let config = HeadlessSimulationConfig {
-            target_duration_minutes: 0.1, // Very short test
-            speed_multiplier: 10.0,       // 10x faster
-            initial_agents: 10,
-            initial_resources: 20,
-            use_ecs: true,
-            ..Default::default()
-        };
+        // Run a few steps
+        for _ in 0..100 {
+            sim.update();
+        }
 
-        let mut simulation = HeadlessSimulationV2::new(config);
-        let diagnostics = simulation.run();
+        let stats = sim.get_stats();
+        assert!(stats.agent_count > 0);
+        assert!(stats.resource_count > 0);
+    }
 
-        println!("Test completed!");
-        println!("Duration: {:.2}s", diagnostics.duration_seconds);
-        println!("Final agents: {}", diagnostics.final_stats.agent_count);
-        println!(
-            "Final resources: {}",
-            diagnostics.final_stats.resource_count
-        );
-        println!("Quality score: {:.3}", diagnostics.simulation_quality_score);
-        println!("Steps per second: {:.1}", diagnostics.steps_per_second);
+    #[test]
+    fn test_parallel_processing() {
+        let mut processor = ParallelProcessor::new();
+        processor.initialize();
 
-        // Basic assertions
-        assert!(diagnostics.duration_seconds > 0.0);
-        assert!(diagnostics.total_steps > 0);
-        assert!(diagnostics.steps_per_second > 0.0);
-
-        println!("Headless Simulation V2 test passed!");
+        // Test that rayon is available after initialization
+        assert!(processor.is_rayon_available() || !processor.is_initialized());
     }
 }
