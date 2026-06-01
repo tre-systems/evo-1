@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# BattleO Simulation Scenarios Runner
+# evo-1 Simulation Scenarios Runner
 # ===================================
 #
 # Curated collection of interesting evolution scenarios for reproducible experiments.
@@ -69,7 +69,7 @@ run_scenario() {
 
 # Main execution
 if [ $# -eq 0 ]; then
-    echo "=== BattleO Simulation Scenarios ==="
+    echo "=== evo-1 Simulation Scenarios ==="
     echo "Available scenarios:"
     echo ""
     for scenario in "${SCENARIOS[@]}"; do

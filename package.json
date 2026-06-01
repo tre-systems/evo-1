@@ -1,0 +1,13 @@
+{
+  "name": "evo-1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "./scripts/build-pages.sh",
+    "build:wasm": "./scripts/build-wasm.sh",
+    "check": "./scripts/check.sh",
+    "dev": "python3 server.py",
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name evo-1"
+  }
+}

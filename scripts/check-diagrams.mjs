@@ -17,7 +17,7 @@ if (probe.error || probe.status !== 0) {
   process.exit(0);
 }
 
-const tempDir = mkdtempSync(join(tmpdir(), 'battleo-diagrams-'));
+const tempDir = mkdtempSync(join(tmpdir(), 'evo-1-diagrams-'));
 
 const dotFiles = readdirSync(diagramDir)
   .filter((file) => file.endsWith('.dot'))

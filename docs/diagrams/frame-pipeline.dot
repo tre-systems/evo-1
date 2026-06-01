@@ -1,4 +1,4 @@
-digraph BattleOFramePipeline {
+digraph EvoOneFramePipeline {
   graph [
     rankdir=LR,
     bgcolor="#ffffff",

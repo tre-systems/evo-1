@@ -220,7 +220,7 @@ export async function createWebGpuRenderer(canvasId) {
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: "opaque" });
 
-  const module = device.createShaderModule({ label: "battleo organisms", code: shaderSource });
+  const module = device.createShaderModule({ label: "evo-1 organisms", code: shaderSource });
   const instanceLayout = {
     arrayStride: BYTES_PER_INSTANCE,
     stepMode: "instance",
@@ -236,7 +236,7 @@ export async function createWebGpuRenderer(canvasId) {
   };
 
   const pipeline = device.createRenderPipeline({
-    label: "battleo organisms",
+    label: "evo-1 organisms",
     layout: "auto",
     vertex: { module, entryPoint: "vs_main", buffers: [instanceLayout] },
     fragment: {
@@ -278,7 +278,7 @@ export function renderWebGpu(renderer, agents, agentCount, resources, resourceCo
     device.queue.writeBuffer(agentBuffer, 0, agents);
   }
 
-  const encoder = device.createCommandEncoder({ label: "battleo frame" });
+  const encoder = device.createCommandEncoder({ label: "evo-1 frame" });
   const view = context.getCurrentTexture().createView();
   const pass = encoder.beginRenderPass({
     colorAttachments: [{

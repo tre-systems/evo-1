@@ -1,6 +1,8 @@
-# BattleO
+# evo-1
 
-BattleO is a Rust evolutionary simulation with two supported runtimes: a native headless runner for experiments and a WebAssembly browser app for interactive visualization.
+evo-1 is a Rust evolutionary simulation with two supported runtimes: a native headless runner for experiments and a WebAssembly browser app for interactive visualization.
+
+It is the first project in the TRE evo series: a selection-field ecology sandbox for watching agents compete, feed, reproduce, and diverge under visible selection pressure.
 
 ## What It Contains
 
@@ -39,6 +41,24 @@ python3 server.py
 Open `http://127.0.0.1:8000`.
 
 `server.py` binds to `127.0.0.1` and sends the COOP/COEP headers required for `SharedArrayBuffer` and `wasm-bindgen-rayon`.
+
+### Cloudflare Pages
+
+The intended production target is `https://evo-1.tre.systems` on a Cloudflare Pages project named `evo-1`.
+
+Build the deployable static bundle:
+
+```bash
+./scripts/build-pages.sh
+```
+
+Deploy it directly with Wrangler:
+
+```bash
+npx wrangler pages deploy dist --project-name evo-1
+```
+
+For the Pages dashboard/Git integration, use `./scripts/build-pages.sh` as the build command and `dist` as the build output directory.
 
 ### Headless Runner
 
@@ -86,6 +106,7 @@ node scripts/check-diagrams.mjs
 - [Product Vision](docs/vision.md) - original ambition, research notes, and iteration roadmap.
 - [API Reference](docs/api-reference.md) - public Rust, WASM, and headless interfaces.
 - [Architecture Diagrams](docs/diagrams/README.md) - Graphviz sources, rendered PNGs, conventions, and render commands.
+- [Deployment](docs/deployment.md) - Cloudflare Pages build, headers, and `evo-1.tre.systems` setup.
 - [Maintenance Notes](docs/maintenance.md) - required checks, browser smoke test, and deployment status.
 - [Documentation Index](docs/README.md) - compact docs map.
 

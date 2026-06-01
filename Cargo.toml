@@ -1,9 +1,9 @@
 [package]
-name = "battleo"
+name = "evo-1"
 version = "0.1.0"
 edition = "2021"
-description = "Evolutionary agent simulation with native headless and WebAssembly browser modes"
-repository = "https://github.com/rgilks/battleo"
+description = "Selection-field evolutionary ecology simulation with native headless and WebAssembly browser modes"
+repository = "https://github.com/rgilks/evo-1"
 license = "MIT"
 
 [lib]

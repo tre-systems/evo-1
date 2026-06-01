@@ -1,6 +1,6 @@
-# BattleO Documentation
+# evo-1 Documentation
 
-Essential documentation for the BattleO evolutionary simulation.
+Essential documentation for the evo-1 evolutionary simulation.
 
 ## Core Documentation
 
@@ -8,6 +8,7 @@ Essential documentation for the BattleO evolutionary simulation.
 - **[Product Vision](vision.md)** - Original ambition, research notes, and iteration roadmap
 - **[Architecture Diagrams](diagrams/README.md)** - Graphviz sources, rendered PNGs, and diagram conventions
 - **[API Reference](api-reference.md)** - Complete API documentation
+- **[Deployment](deployment.md)** - Cloudflare Pages and `evo-1.tre.systems` setup
 - **[Maintenance Notes](maintenance.md)** - Checks, browser smoke tests, and live-site status
 
 ## Quick Links

@@ -3,7 +3,7 @@ use clap::Parser;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Parser, Debug)]
-#[command(author, version, about = "Run BattleO as a native headless simulation")]
+#[command(author, version, about = "Run evo-1 as a native headless simulation")]
 struct Args {
     #[arg(default_value_t = 2.0)]
     duration_minutes: f64,
@@ -23,10 +23,10 @@ struct Args {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    use battleo::headless::{HeadlessConfig, HeadlessSimulation};
+    use evo_1::headless::{HeadlessConfig, HeadlessSimulation};
     use std::time::Instant;
 
-    println!("=== BattleO Headless Simulation ===");
+    println!("=== evo-1 Headless Simulation ===");
     println!("Running high-performance evolutionary simulation...\n");
 
     let args = Args::parse();
@@ -162,7 +162,7 @@ fn main() {
     }
 
     println!("\n=== Summary ===");
-    println!("BattleO headless simulation completed successfully!");
+    println!("evo-1 headless simulation completed successfully!");
     println!(
         "The simulation ran {:.1}x faster than real-time",
         diagnostics.steps_per_second / 60.0

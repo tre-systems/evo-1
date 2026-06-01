@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# BattleO Headless Simulation Runner
+# evo-1 Headless Simulation Runner
 # =================================
 # 
 # Flexible script for custom experiments and parameter testing.
@@ -32,7 +32,7 @@ MAX_AGENTS=${5:-3000}
 MAX_RESOURCES=${6:-2000}
 SEED=${7:-}
 
-echo "=== BattleO Headless Simulation Runner ==="
+echo "=== evo-1 Headless Simulation Runner ==="
 echo "Configuration:"
 echo "  Duration: ${DURATION_MINUTES} minutes"
 echo "  Speed multiplier: ${SPEED_MULTIPLIER}x"

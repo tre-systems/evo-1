@@ -24,7 +24,7 @@ pub mod headless;
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub struct BattleSimulation {
+pub struct EvoOneSimulation {
     simulation: simulation::Simulation,
     #[wasm_bindgen(skip)]
     renderer: Option<renderer::WebRenderer>,
@@ -32,9 +32,9 @@ pub struct BattleSimulation {
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-impl BattleSimulation {
+impl EvoOneSimulation {
     #[wasm_bindgen(constructor)]
-    pub fn new(canvas_id: Option<String>) -> Result<BattleSimulation, JsValue> {
+    pub fn new(canvas_id: Option<String>) -> Result<EvoOneSimulation, JsValue> {
         console_error_panic_hook::set_once();
 
         let simulation = simulation::Simulation::new();
@@ -45,7 +45,7 @@ impl BattleSimulation {
             None
         };
 
-        Ok(BattleSimulation {
+        Ok(EvoOneSimulation {
             simulation,
             renderer,
         })
@@ -99,10 +99,10 @@ impl BattleSimulation {
 }
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = createBattleSimulation)]
-pub async fn create_battle_simulation(
+#[wasm_bindgen(js_name = createEvoOneSimulation)]
+pub async fn create_evo_one_simulation(
     canvas_id: Option<String>,
-) -> Result<BattleSimulation, JsValue> {
+) -> Result<EvoOneSimulation, JsValue> {
     console_error_panic_hook::set_once();
 
     let simulation = simulation::Simulation::new();
@@ -112,7 +112,7 @@ pub async fn create_battle_simulation(
         None
     };
 
-    Ok(BattleSimulation {
+    Ok(EvoOneSimulation {
         simulation,
         renderer,
     })

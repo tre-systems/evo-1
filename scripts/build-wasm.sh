@@ -26,6 +26,8 @@ if ! command -v wasm-pack >/dev/null 2>&1; then
   exit 1
 fi
 
+rm -rf pkg
+
 RUSTFLAGS="-C target-feature=+atomics,+bulk-memory" \
   RUSTUP_TOOLCHAIN="${THREADS_TOOLCHAIN}" \
   wasm-pack build --target web --out-dir pkg . --features wasm-bindgen-rayon

@@ -1,12 +1,12 @@
 # Architecture and Patterns
 
-This document is the source of truth for BattleO's architectural shape and recurring implementation patterns. Public callable APIs are documented in [api-reference.md](api-reference.md); generated diagrams are documented in [diagrams/README.md](diagrams/README.md).
+This document is the source of truth for evo-1's architectural shape and recurring implementation patterns. Public callable APIs are documented in [api-reference.md](api-reference.md); generated diagrams are documented in [diagrams/README.md](diagrams/README.md).
 
 ## System Shape
 
-BattleO has one simulation core with two runtime adapters:
+evo-1 has one simulation core with two runtime adapters:
 
-- Browser runtime: `index.html` loads the generated WASM package and calls `createBattleSimulation`, `BattleSimulation`, and `ParallelProcessor` from [src/lib.rs](../src/lib.rs).
+- Browser runtime: `index.html` loads the generated WASM package and calls `createEvoOneSimulation`, `EvoOneSimulation`, and `ParallelProcessor` from [src/lib.rs](../src/lib.rs).
 - Native runtime: [src/bin/headless.rs](../src/bin/headless.rs) parses CLI arguments and runs `HeadlessSimulation` from [src/headless.rs](../src/headless.rs).
 - Shared core: [src/simulation.rs](../src/simulation.rs) owns the public simulation facade and delegates world mutation to [src/ecs.rs](../src/ecs.rs).
 
@@ -20,7 +20,7 @@ The diagrams show the same model visually:
 
 | Module | Responsibility |
 | --- | --- |
-| [src/lib.rs](../src/lib.rs) | Crate exports plus WASM-only `createBattleSimulation`, `BattleSimulation`, `ParallelProcessor`, and panic hook bindings. |
+| [src/lib.rs](../src/lib.rs) | Crate exports plus WASM-only `createEvoOneSimulation`, `EvoOneSimulation`, `ParallelProcessor`, and panic hook bindings. |
 | [src/simulation.rs](../src/simulation.rs) | Stable facade for construction, updates, commands, stats, runtime capabilities, and snapshot DTO conversion. |
 | [src/ecs.rs](../src/ecs.rs) | ECS world ownership, entity spawning, ordered systems, frame-event ledger, lifecycle rules, and query helpers. |
 | [src/ecs/components.rs](../src/ecs/components.rs) | Data-only components and marker tags such as `AgentTag` and `ResourceTag`. |
@@ -37,7 +37,7 @@ The diagrams show the same model visually:
 
 Platform-specific code stays at the edge:
 
-- `BattleSimulation` converts browser/WASM calls into `Simulation` calls.
+- `EvoOneSimulation` converts browser/WASM calls into `Simulation` calls.
 - `ParallelProcessor` owns WASM thread-pool initialization and exposes readiness as a capability.
 - `HeadlessSimulation` owns native run configuration, Rayon setup, progress output, and diagnostics.
 
@@ -178,7 +178,7 @@ node scripts/check-diagrams.mjs
 
 ## Build and Runtime Notes
 
-The browser package is built by [scripts/build-wasm.sh](../scripts/build-wasm.sh). It uses:
+The browser package is built by [scripts/build-wasm.sh](../scripts/build-wasm.sh). The Cloudflare Pages bundle is built by [scripts/build-pages.sh](../scripts/build-pages.sh) into `dist/`. These scripts use:
 
 - `nightly-2024-08-02`,
 - `rust-src`,

@@ -1,4 +1,4 @@
-digraph BattleOSystemOverview {
+digraph EvoOneSystemOverview {
   graph [
     rankdir=TB,
     bgcolor="#ffffff",
@@ -13,7 +13,7 @@ digraph BattleOSystemOverview {
     fontname="Avenir",
     label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
-        <TR><TD><FONT POINT-SIZE="34"><B>BattleO System Overview</B></FONT></TD></TR>
+        <TR><TD><FONT POINT-SIZE="34"><B>evo-1 System Overview</B></FONT></TD></TR>
       </TABLE>
     >,
     labelloc=t,
@@ -65,7 +65,7 @@ digraph BattleOSystemOverview {
       margin=22
     ];
 
-    wasm_adapter [label=<<B>BattleSimulation</B><BR/><FONT POINT-SIZE="15">WASM API in src/lib.rs</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
+    wasm_adapter [label=<<B>EvoOneSimulation</B><BR/><FONT POINT-SIZE="15">WASM API in src/lib.rs</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
     parallel_adapter [label=<<B>ParallelProcessor</B><BR/><FONT POINT-SIZE="15">thread-pool readiness</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
     headless_adapter [label=<<B>HeadlessSimulation</B><BR/><FONT POINT-SIZE="15">native experiment runner</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
 

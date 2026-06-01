@@ -1,4 +1,4 @@
-digraph BattleORuntimeModel {
+digraph EvoOneRuntimeModel {
   graph [
     rankdir=TB,
     bgcolor="#ffffff",

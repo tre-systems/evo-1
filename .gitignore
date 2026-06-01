@@ -3,6 +3,7 @@ target/
 
 # WebAssembly build output
 pkg/
+dist/
 
 # IDE files
 .vscode/

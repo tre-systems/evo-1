@@ -1,11 +1,11 @@
 # Maintenance Notes
 
-BattleO is a Rust evolutionary simulation with two supported execution paths:
+evo-1 is a Rust evolutionary simulation with two supported execution paths:
 
 - Native headless runs for experiments and smoke tests.
 - WebAssembly browser runs with WebGPU rendering and WebGL/Canvas2D fallbacks.
 
-There is no configured live site for this repository at the moment. GitHub reports no Pages site and the repository homepage URL is empty, so browser smoke tests should use the local development server until a deployment target is added.
+The intended live site is `https://evo-1.tre.systems` on a Cloudflare Pages project named `evo-1`. Until that Pages project and custom domain are active, browser smoke tests should use the local development server.
 
 ## Required Checks
 
@@ -21,6 +21,12 @@ For the threaded browser package build:
 
 ```bash
 ./scripts/build-wasm.sh
+```
+
+For the Cloudflare Pages bundle:
+
+```bash
+./scripts/build-pages.sh
 ```
 
 The threaded WASM path requires `nightly-2024-08-02` with `rust-src` and `wasm32-unknown-unknown` installed:
@@ -63,4 +69,4 @@ Then open `http://127.0.0.1:8000` and verify:
 - `Reset` returns the simulation to its configured initial population.
 - The browser console does not show initialization errors.
 
-If a live deployment is added later, document the production URL in the README and smoke test that URL after every pushed code change.
+After the Cloudflare Pages deployment is active, smoke test `https://evo-1.tre.systems` after every pushed code change. If the production domain is not active yet, smoke test `http://127.0.0.1:8000` and the local `dist/` build.
