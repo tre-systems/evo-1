@@ -3,7 +3,7 @@
 BattleO is a Rust evolutionary simulation with two supported execution paths:
 
 - Native headless runs for experiments and smoke tests.
-- WebAssembly browser runs with Canvas2D/WebGL rendering.
+- WebAssembly browser runs with WebGPU rendering and WebGL/Canvas2D fallbacks.
 
 There is no configured live site for this repository at the moment. GitHub reports no Pages site and the repository homepage URL is empty, so browser smoke tests should use the local development server until a deployment target is added.
 

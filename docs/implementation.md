@@ -6,7 +6,7 @@ This document is the source of truth for BattleO's architectural shape and recur
 
 BattleO has one simulation core with two runtime adapters:
 
-- Browser runtime: `index.html` loads the generated WASM package and calls `BattleSimulation` and `ParallelProcessor` from [src/lib.rs](../src/lib.rs).
+- Browser runtime: `index.html` loads the generated WASM package and calls `createBattleSimulation`, `BattleSimulation`, and `ParallelProcessor` from [src/lib.rs](../src/lib.rs).
 - Native runtime: [src/bin/headless.rs](../src/bin/headless.rs) parses CLI arguments and runs `HeadlessSimulation` from [src/headless.rs](../src/headless.rs).
 - Shared core: [src/simulation.rs](../src/simulation.rs) owns the public simulation facade and delegates world mutation to [src/ecs.rs](../src/ecs.rs).
 
@@ -20,7 +20,7 @@ The diagrams show the same model visually:
 
 | Module | Responsibility |
 | --- | --- |
-| [src/lib.rs](../src/lib.rs) | Crate exports plus WASM-only `BattleSimulation`, `ParallelProcessor`, and panic hook bindings. |
+| [src/lib.rs](../src/lib.rs) | Crate exports plus WASM-only `createBattleSimulation`, `BattleSimulation`, `ParallelProcessor`, and panic hook bindings. |
 | [src/simulation.rs](../src/simulation.rs) | Stable facade for construction, updates, commands, stats, runtime capabilities, and snapshot DTO conversion. |
 | [src/ecs.rs](../src/ecs.rs) | ECS world ownership, entity spawning, ordered systems, frame-event ledger, lifecycle rules, and query helpers. |
 | [src/ecs/components.rs](../src/ecs/components.rs) | Data-only components and marker tags such as `AgentTag` and `ResourceTag`. |
@@ -28,7 +28,7 @@ The diagrams show the same model visually:
 | [src/genes.rs](../src/genes.rs) | Compatibility import path for the canonical ECS `Genes` component plus gene construction and inheritance helpers. |
 | [src/agent.rs](../src/agent.rs) | Read-only agent snapshot DTO exposed to renderers and external callers. |
 | [src/resource.rs](../src/resource.rs) | Read-only resource snapshot DTO exposed to renderers and external callers. |
-| [src/renderer.rs](../src/renderer.rs) | WASM-only renderer with WebGL first and Canvas2D fallback. |
+| [src/renderer.rs](../src/renderer.rs) | WASM-only renderer with WebGPU first, then WebGL and Canvas2D fallbacks. |
 | [src/headless.rs](../src/headless.rs) | Native experiment runner and diagnostics aggregation. |
 
 ## Pattern Catalog
@@ -153,9 +153,11 @@ The active writable model is ECS. `agent::Agent` and `resource::Resource` are re
 
 ### Rendering Strategy
 
-Rendering is browser-only and reads snapshots from `Simulation`. `WebRenderer` attempts WebGL first and falls back to Canvas2D when WebGL setup is unavailable.
+Rendering is browser-only and reads snapshots from `Simulation`. `WebRenderer` attempts WebGPU first and falls back to WebGL, then Canvas2D, when WebGPU setup is unavailable.
 
 Rendering code should stay read-only with respect to simulation rules. Add render-specific fields to snapshot DTOs only when they are stable API data; otherwise prefer a dedicated render snapshot type.
+
+WebGPU should be used for batched visual work: organism bodies, quieter resources, motion trails, heatmaps, and short-lived birth/death/combat effects. WebGL and Canvas2D are compatibility paths, not the primary place to add richer visual systems.
 
 ### Diagnostics Summary
 
@@ -197,6 +199,7 @@ These are the current architecture pressure points to address before adding larg
 - Replace full agent/resource DTO cloning with compact render-specific snapshots if browser rendering or API serialization becomes a bottleneck.
 - Collapse the resource `Size` duplication. Resource entities currently carry both `Resource::size` and a `Size` component, so future resource-rendering changes should pick one source of truth.
 - Extract decision scoring from `EcsWorld` into focused system helpers if behavior policy work grows beyond the current food, threat, prey, and mate decisions.
+- Move richer visual effects toward explicit render snapshots and WebGPU buffers rather than adding browser-only presentation fields to the core ECS model.
 
 ## Documentation Boundary
 

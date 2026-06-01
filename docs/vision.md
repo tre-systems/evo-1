@@ -90,6 +90,20 @@ Next work:
 - Add inspect-agent details for genes, energy, generation, lineage, and state.
 - Add trait overlays, population timeline, and lineage summaries.
 
+### 6. Visual Simulation Backlog
+
+Goal: make the simulation itself interesting to watch while keeping behavior readable.
+
+Backlog:
+
+- Make agents visually distinct from resources. Agents should be directional organisms whose orientation follows velocity; resources should be quieter nutrients or spores.
+- Use behavior states as visible signals: hunting should read as predatory pressure, fleeing as escape motion, feeding as absorption, fighting as impact, and reproducing as a paired or haloed event.
+- Let genes affect silhouette and material treatment. Size, aggression, defense, stealth, speed, and color hue should shape how an organism looks, not only how it moves.
+- Add motion trails and short-lived event pulses for births, deaths, attacks, and resource consumption.
+- Add optional observability overlays for predator/prey pressure, resource density, trait distribution, and lineage/generation.
+- Keep rendering performant enough for large populations by batching entities and effects instead of issuing one draw call per organism.
+- Separate simulation-space coordinates from display-space presentation so full-screen rendering can become sharper without changing ecology rules.
+
 ## Technology Direction
 
-Keep the current Rust, WASM, `hecs`, and custom rendering stack while the simulation model is still changing quickly. A Bevy migration could be valuable if BattleO becomes more game-like, but it would slow down the immediate goal: making the ecosystem genuinely interesting.
+Keep the current Rust, WASM, `hecs`, and custom rendering stack while the simulation model is still changing quickly. The browser renderer should prefer WebGPU, with WebGL and Canvas2D retained as compatibility fallbacks. A Bevy migration could be valuable if BattleO becomes more game-like, but it would slow down the immediate goal: making the ecosystem genuinely interesting.

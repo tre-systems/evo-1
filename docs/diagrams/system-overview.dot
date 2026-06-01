@@ -125,7 +125,7 @@ digraph BattleOSystemOverview {
       margin=22
     ];
 
-    renderer [label=<<B>WebRenderer</B><BR/><FONT POINT-SIZE="15">WebGL first, Canvas2D fallback</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
+    renderer [label=<<B>WebRenderer</B><BR/><FONT POINT-SIZE="15">WebGPU first, WebGL/Canvas2D fallback</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
     stats [label=<<B>SimulationStats</B><BR/><FONT POINT-SIZE="15">counts, behavior, events</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
     diagnostics [label=<<B>SimulationDiagnostics</B><BR/><FONT POINT-SIZE="15">headless experiment summary</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
     dto [label=<<B>Snapshot DTOs</B><BR/><FONT POINT-SIZE="15">Agent and Resource read models</FONT>>, fillcolor="#f5f3ff:#ffffff", color="#7c3aed"];

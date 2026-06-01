@@ -40,7 +40,7 @@ impl BattleSimulation {
         let simulation = simulation::Simulation::new();
 
         let renderer = if let Some(canvas_id) = canvas_id {
-            Some(renderer::WebRenderer::new(&canvas_id)?)
+            Some(renderer::WebRenderer::new_fallback(&canvas_id)?)
         } else {
             None
         };
@@ -96,6 +96,26 @@ impl BattleSimulation {
     pub fn is_parallel_resources_enabled(&self) -> bool {
         self.simulation.runtime_capabilities().parallel_resources
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = createBattleSimulation)]
+pub async fn create_battle_simulation(
+    canvas_id: Option<String>,
+) -> Result<BattleSimulation, JsValue> {
+    console_error_panic_hook::set_once();
+
+    let simulation = simulation::Simulation::new();
+    let renderer = if let Some(canvas_id) = canvas_id {
+        Some(renderer::WebRenderer::new(&canvas_id).await?)
+    } else {
+        None
+    };
+
+    Ok(BattleSimulation {
+        simulation,
+        renderer,
+    })
 }
 
 // ============================================================================

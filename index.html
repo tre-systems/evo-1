@@ -324,6 +324,11 @@
         color: #ff8d8d;
       }
 
+      .stat-value-small {
+        font-size: clamp(0.95rem, 3vw, 1.2rem);
+        line-height: 1.1;
+      }
+
       .screen-plate {
         position: fixed;
         right: 18px;
@@ -539,6 +544,12 @@
                 <div class="stat-label">FPS</div>
                 <div class="stat-value" id="fps">0</div>
               </div>
+              <div class="stat-card" data-tone="gold">
+                <div class="stat-label">Renderer</div>
+                <div class="stat-value stat-value-small" id="renderingMode">
+                  -
+                </div>
+              </div>
             </div>
           </section>
         </div>
@@ -552,7 +563,7 @@
 
     <script type="module">
       import init, {
-        BattleSimulation,
+        createBattleSimulation,
         ParallelProcessor,
       } from "./pkg/battleo.js";
 
@@ -728,10 +739,11 @@
           initParallelBtn.disabled = false;
 
           updateStatus("Creating simulation", "info");
-          simulation = new BattleSimulation("canvas");
+          simulation = await createBattleSimulation("canvas");
 
           const renderingMode = simulation.get_rendering_mode();
           console.log(`Rendering mode: ${renderingMode}`);
+          document.getElementById("renderingMode").textContent = renderingMode;
           updateStatus(`${renderingMode} active`, "success");
 
           updateStats(simulation.get_stats());

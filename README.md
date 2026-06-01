@@ -8,7 +8,7 @@ BattleO is a Rust evolutionary simulation with two supported runtimes: a native 
 - Spatial-grid lookups for nearby agents and resources.
 - Genetic traits, reproduction, resource consumption, death, and predator/prey interactions.
 - Native headless execution with Rayon-enabled resource updates.
-- Browser execution with Canvas2D/WebGL rendering and optional `wasm-bindgen-rayon` worker-pool support.
+- Browser execution with WebGPU rendering, WebGL/Canvas2D fallbacks, and optional `wasm-bindgen-rayon` worker-pool support.
 - Graphviz architecture diagrams committed as source `.dot` files and rendered PNGs.
 
 ## Quick Start
@@ -91,7 +91,7 @@ node scripts/check-diagrams.mjs
 
 ## Browser Requirements
 
-The browser app needs a modern browser with WebAssembly, WebGL or Canvas2D, Web Workers, and `SharedArrayBuffer` under cross-origin isolation. Use `python3 server.py` locally so those headers are present.
+The browser app needs a modern browser with WebAssembly and WebGPU. It falls back to WebGL or Canvas2D when WebGPU is unavailable. Web Workers and `SharedArrayBuffer` require cross-origin isolation; use `python3 server.py` locally so those headers are present.
 
 ## License
 

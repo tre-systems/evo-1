@@ -1,8 +1,325 @@
 use crate::simulation::Simulation;
+use js_sys::Float32Array;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     CanvasRenderingContext2d, HtmlCanvasElement, WebGlBuffer, WebGlProgram, WebGlRenderingContext,
 };
+
+#[wasm_bindgen(inline_js = r#"
+const FLOATS_PER_INSTANCE = 12;
+const BYTES_PER_INSTANCE = FLOATS_PER_INSTANCE * 4;
+
+const shaderSource = `
+struct Uniforms {
+  resolution: vec2<f32>,
+  time: f32,
+  kind: f32,
+};
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+struct VertexOut {
+  @builtin(position) position: vec4<f32>,
+  @location(0) local: vec2<f32>,
+  @location(1) hue: f32,
+  @location(2) energy: f32,
+  @location(3) state: f32,
+  @location(4) traits: vec4<f32>,
+  @location(5) kind: f32,
+};
+
+fn hslToRgb(hue: f32, saturation: f32, lightness: f32) -> vec3<f32> {
+  let c = (1.0 - abs(2.0 * lightness - 1.0)) * saturation;
+  let h = hue / 60.0;
+  let x = c * (1.0 - abs((h % 2.0) - 1.0));
+  var rgb = vec3<f32>(0.0);
+  if (h < 1.0) {
+    rgb = vec3<f32>(c, x, 0.0);
+  } else if (h < 2.0) {
+    rgb = vec3<f32>(x, c, 0.0);
+  } else if (h < 3.0) {
+    rgb = vec3<f32>(0.0, c, x);
+  } else if (h < 4.0) {
+    rgb = vec3<f32>(0.0, x, c);
+  } else if (h < 5.0) {
+    rgb = vec3<f32>(x, 0.0, c);
+  } else {
+    rgb = vec3<f32>(c, 0.0, x);
+  }
+  let m = lightness - c * 0.5;
+  return rgb + vec3<f32>(m);
+}
+
+fn stateTint(state: f32) -> vec3<f32> {
+  if (state < 0.5) {
+    return vec3<f32>(0.50, 0.78, 0.92);
+  }
+  if (state < 1.5) {
+    return vec3<f32>(1.00, 0.26, 0.18);
+  }
+  if (state < 2.5) {
+    return vec3<f32>(0.48, 1.00, 0.52);
+  }
+  if (state < 3.5) {
+    return vec3<f32>(1.00, 0.78, 0.30);
+  }
+  if (state < 4.5) {
+    return vec3<f32>(1.00, 0.42, 0.10);
+  }
+  return vec3<f32>(0.40, 0.82, 1.00);
+}
+
+@vertex
+fn vs_main(
+  @builtin(vertex_index) vertexIndex: u32,
+  @location(0) center: vec2<f32>,
+  @location(1) velocity: vec2<f32>,
+  @location(2) size: f32,
+  @location(3) hue: f32,
+  @location(4) energy: f32,
+  @location(5) state: f32,
+  @location(6) traits: vec4<f32>,
+) -> VertexOut {
+  var corners = array<vec2<f32>, 6>(
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>( 1.0, -1.0),
+    vec2<f32>(-1.0,  1.0),
+    vec2<f32>(-1.0,  1.0),
+    vec2<f32>( 1.0, -1.0),
+    vec2<f32>( 1.0,  1.0),
+  );
+
+  let local = corners[vertexIndex];
+  let isAgent = uniforms.kind > 0.5;
+  let speed = length(velocity);
+  var direction = vec2<f32>(1.0, 0.0);
+  if (speed > 0.0001) {
+    direction = normalize(velocity);
+  }
+  let tangent = vec2<f32>(-direction.y, direction.x);
+
+  let aggression = traits.z;
+  let stealth = traits.w;
+  let lengthScale = select(1.0, 1.20 + aggression * 0.55 + min(speed * 0.025, 0.40), isAgent);
+  let widthScale = select(1.0, 0.72 + energy * 0.26 - stealth * 0.16, isAgent);
+  let resourceBreath = 1.0 + 0.08 * sin(uniforms.time * 1.8 + center.x * 0.017 + center.y * 0.011);
+  let agentBreath = 1.0 + 0.04 * sin(uniforms.time * 2.4 + hue * 0.03);
+  let breath = select(resourceBreath, agentBreath, isAgent);
+
+  let worldOffset =
+    direction * local.x * size * lengthScale * breath +
+    tangent * local.y * size * widthScale * breath;
+  let position = center + worldOffset;
+  let clip = (position / uniforms.resolution) * 2.0 - 1.0;
+
+  var out: VertexOut;
+  out.position = vec4<f32>(clip.x, -clip.y, 0.0, 1.0);
+  out.local = vec2<f32>(local.x / lengthScale, local.y / widthScale);
+  out.hue = hue;
+  out.energy = energy;
+  out.state = state;
+  out.traits = traits;
+  out.kind = uniforms.kind;
+  return out;
+}
+
+@fragment
+fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
+  let dist = length(in.local);
+  if (dist > 1.0) {
+    discard;
+  }
+
+  let edge = 1.0 - smoothstep(0.78, 1.0, dist);
+  let membrane = smoothstep(0.98, 0.72, dist) * smoothstep(0.42, 0.94, dist);
+  let core = 1.0 - smoothstep(0.0, 0.32, dist);
+  let organic = 0.5 + 0.5 * sin(in.local.x * 12.0 + in.local.y * 9.0 + uniforms.time * 1.8);
+
+  if (in.kind < 0.5) {
+    let spawn = in.traits.x;
+    let depletion = in.traits.y;
+    let base = hslToRgb(in.hue, 0.58, 0.52 + in.energy * 0.08);
+    let glow = hslToRgb(118.0, 0.42, 0.72);
+    let color = mix(base, glow, 0.22 + organic * 0.08);
+    let alpha = (edge * 0.18 + membrane * 0.22 + core * 0.18) * (1.0 - depletion * 0.72) * (0.55 + spawn * 0.45);
+    return vec4<f32>(color, alpha);
+  }
+
+  let spawn = in.traits.x;
+  let death = in.traits.y;
+  let aggression = in.traits.z;
+  let stealth = in.traits.w;
+  let geneColor = hslToRgb(in.hue, 0.72, 0.45 + in.energy * 0.18);
+  let behaviorColor = stateTint(in.state);
+  let shell = hslToRgb(in.hue + 18.0, 0.52, 0.76);
+  var color = mix(geneColor, behaviorColor, 0.34 + aggression * 0.18);
+  color = mix(color, shell, membrane * 0.28);
+  color += core * vec3<f32>(0.24, 0.22, 0.16);
+  color += organic * 0.035;
+
+  let stateGlow = select(0.12, 0.34, in.state > 0.5);
+  let alpha = (edge * 0.42 + membrane * 0.30 + core * 0.26 + stateGlow * (1.0 - dist)) *
+    (0.86 - stealth * 0.22) *
+    (0.45 + in.energy * 0.55) *
+    (1.0 - death * 0.78) *
+    (0.60 + spawn * 0.40);
+
+  return vec4<f32>(color, min(alpha, 0.92));
+}
+`;
+
+function createUniform(device, pipeline) {
+  const buffer = device.createBuffer({
+    size: 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  const bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [{ binding: 0, resource: { buffer } }],
+  });
+  return { buffer, bindGroup };
+}
+
+function ensureInstanceBuffer(renderer, slot, count) {
+  const required = Math.max(BYTES_PER_INSTANCE, count * BYTES_PER_INSTANCE);
+  const existing = renderer[slot];
+  if (existing && existing.size >= required) {
+    return existing.buffer;
+  }
+  const size = 2 ** Math.ceil(Math.log2(required));
+  const buffer = renderer.device.createBuffer({
+    size,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  });
+  renderer[slot] = { buffer, size };
+  return buffer;
+}
+
+export async function createWebGpuRenderer(canvasId) {
+  if (!globalThis.navigator?.gpu) {
+    throw new Error("WebGPU is not available in this browser");
+  }
+
+  const canvas = document.getElementById(canvasId);
+  if (!(canvas instanceof HTMLCanvasElement)) {
+    throw new Error(`Canvas '${canvasId}' was not found`);
+  }
+
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) {
+    throw new Error("WebGPU adapter request returned no adapter");
+  }
+
+  const device = await adapter.requestDevice();
+  const context = canvas.getContext("webgpu");
+  if (!context) {
+    throw new Error("WebGPU canvas context is unavailable");
+  }
+
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  context.configure({ device, format, alphaMode: "opaque" });
+
+  const module = device.createShaderModule({ label: "battleo organisms", code: shaderSource });
+  const instanceLayout = {
+    arrayStride: BYTES_PER_INSTANCE,
+    stepMode: "instance",
+    attributes: [
+      { shaderLocation: 0, offset: 0, format: "float32x2" },
+      { shaderLocation: 1, offset: 8, format: "float32x2" },
+      { shaderLocation: 2, offset: 16, format: "float32" },
+      { shaderLocation: 3, offset: 20, format: "float32" },
+      { shaderLocation: 4, offset: 24, format: "float32" },
+      { shaderLocation: 5, offset: 28, format: "float32" },
+      { shaderLocation: 6, offset: 32, format: "float32x4" },
+    ],
+  };
+
+  const pipeline = device.createRenderPipeline({
+    label: "battleo organisms",
+    layout: "auto",
+    vertex: { module, entryPoint: "vs_main", buffers: [instanceLayout] },
+    fragment: {
+      module,
+      entryPoint: "fs_main",
+      targets: [{
+        format,
+        blend: {
+          color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
+          alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
+        },
+      }],
+    },
+    primitive: { topology: "triangle-list" },
+  });
+
+  const renderer = { canvas, context, device, format, pipeline };
+  renderer.resourceUniform = createUniform(device, pipeline);
+  renderer.agentUniform = createUniform(device, pipeline);
+  return renderer;
+}
+
+export function renderWebGpu(renderer, agents, agentCount, resources, resourceCount, time) {
+  const { canvas, context, device, pipeline } = renderer;
+  const width = canvas.width;
+  const height = canvas.height;
+
+  const resourceUniforms = new Float32Array([width, height, time, 0]);
+  const agentUniforms = new Float32Array([width, height, time, 1]);
+  device.queue.writeBuffer(renderer.resourceUniform.buffer, 0, resourceUniforms);
+  device.queue.writeBuffer(renderer.agentUniform.buffer, 0, agentUniforms);
+
+  const resourceBuffer = ensureInstanceBuffer(renderer, "resourceBuffer", resourceCount);
+  const agentBuffer = ensureInstanceBuffer(renderer, "agentBuffer", agentCount);
+  if (resourceCount > 0) {
+    device.queue.writeBuffer(resourceBuffer, 0, resources);
+  }
+  if (agentCount > 0) {
+    device.queue.writeBuffer(agentBuffer, 0, agents);
+  }
+
+  const encoder = device.createCommandEncoder({ label: "battleo frame" });
+  const view = context.getCurrentTexture().createView();
+  const pass = encoder.beginRenderPass({
+    colorAttachments: [{
+      view,
+      clearValue: { r: 0.012, g: 0.018, b: 0.034, a: 1 },
+      loadOp: "clear",
+      storeOp: "store",
+    }],
+  });
+
+  pass.setPipeline(pipeline);
+  if (resourceCount > 0) {
+    pass.setBindGroup(0, renderer.resourceUniform.bindGroup);
+    pass.setVertexBuffer(0, resourceBuffer);
+    pass.draw(6, resourceCount);
+  }
+  if (agentCount > 0) {
+    pass.setBindGroup(0, renderer.agentUniform.bindGroup);
+    pass.setVertexBuffer(0, agentBuffer);
+    pass.draw(6, agentCount);
+  }
+  pass.end();
+  device.queue.submit([encoder.finish()]);
+}
+"#)]
+extern "C" {
+    #[wasm_bindgen(js_name = createWebGpuRenderer, catch)]
+    fn create_webgpu_renderer(canvas_id: &str) -> Result<js_sys::Promise, JsValue>;
+
+    #[wasm_bindgen(js_name = renderWebGpu, catch)]
+    fn render_webgpu(
+        renderer: &JsValue,
+        agents: &Float32Array,
+        agent_count: u32,
+        resources: &Float32Array,
+        resource_count: u32,
+        time: f32,
+    ) -> Result<(), JsValue>;
+}
+
+const INSTANCE_FLOATS: usize = 12;
 
 // ============================================================================
 // WEB RENDERER
@@ -10,6 +327,7 @@ use web_sys::{
 
 pub struct WebRenderer {
     canvas: HtmlCanvasElement,
+    webgpu_renderer: Option<JsValue>,
     ctx_2d: Option<CanvasRenderingContext2d>,
     gl: Option<WebGlRenderingContext>,
     use_webgl: bool,
@@ -23,14 +341,67 @@ pub struct WebRenderer {
 }
 
 impl WebRenderer {
-    pub fn new(canvas_id: &str) -> Result<Self, JsValue> {
+    pub async fn new(canvas_id: &str) -> Result<Self, JsValue> {
+        let canvas = Self::canvas_by_id(canvas_id)?;
+
+        match create_webgpu_renderer(canvas_id) {
+            Ok(promise) => match JsFuture::from(promise).await {
+                Ok(webgpu_renderer) => {
+                    web_sys::console::log_1(&"Using WebGPU rendering".into());
+                    let canvas_width = canvas.width() as f32;
+                    let canvas_height = canvas.height() as f32;
+
+                    Ok(WebRenderer {
+                        canvas,
+                        webgpu_renderer: Some(webgpu_renderer),
+                        ctx_2d: None,
+                        gl: None,
+                        use_webgl: false,
+                        program: None,
+                        vertex_buffer: None,
+                        canvas_width,
+                        canvas_height,
+                        start_time: 0.0,
+                    })
+                }
+                Err(error) => {
+                    web_sys::console::warn_1(
+                        &format!(
+                            "WebGPU setup failed, trying WebGL/Canvas2D fallback: {:?}",
+                            error
+                        )
+                        .into(),
+                    );
+                    Self::new_fallback_from_canvas(canvas)
+                }
+            },
+            Err(error) => {
+                web_sys::console::warn_1(
+                    &format!(
+                        "WebGPU setup failed, trying WebGL/Canvas2D fallback: {:?}",
+                        error
+                    )
+                    .into(),
+                );
+                Self::new_fallback_from_canvas(canvas)
+            }
+        }
+    }
+
+    pub fn new_fallback(canvas_id: &str) -> Result<Self, JsValue> {
+        Self::new_fallback_from_canvas(Self::canvas_by_id(canvas_id)?)
+    }
+
+    fn canvas_by_id(canvas_id: &str) -> Result<HtmlCanvasElement, JsValue> {
         let window = web_sys::window().ok_or("No window")?;
         let document = window.document().ok_or("No document")?;
-        let canvas = document
+        document
             .get_element_by_id(canvas_id)
             .and_then(|el| el.dyn_into::<HtmlCanvasElement>().ok())
-            .ok_or("Canvas not found")?;
+            .ok_or("Canvas not found".into())
+    }
 
+    fn new_fallback_from_canvas(canvas: HtmlCanvasElement) -> Result<Self, JsValue> {
         // Try WebGL first, fallback to Canvas2D
         let gl = canvas
             .get_context("webgl")
@@ -51,6 +422,7 @@ impl WebRenderer {
 
         let mut renderer = WebRenderer {
             canvas,
+            webgpu_renderer: None,
             ctx_2d,
             gl: None,
             use_webgl: gl.is_some(),
@@ -96,7 +468,9 @@ impl WebRenderer {
     }
 
     pub fn render(&mut self, simulation: &Simulation) {
-        if self.use_webgl {
+        if self.webgpu_renderer.is_some() {
+            self.render_webgpu(simulation);
+        } else if self.use_webgl {
             self.render_webgl(simulation);
         } else {
             self.render_canvas2d(simulation);
@@ -276,6 +650,84 @@ impl WebRenderer {
                     .unwrap_or_else(|| "unknown error".to_string())
             )
             .into())
+        }
+    }
+
+    fn render_webgpu(&mut self, simulation: &Simulation) {
+        let Some(webgpu_renderer) = &self.webgpu_renderer else {
+            return;
+        };
+
+        let current_time = js_sys::Date::now() / 1000.0;
+        if self.start_time == 0.0 {
+            self.start_time = current_time;
+        }
+        let time = (current_time - self.start_time) as f32;
+
+        let agents = simulation.get_agents();
+        let resources = simulation.get_resources();
+
+        let mut agent_data = Vec::with_capacity(agents.len() * INSTANCE_FLOATS);
+        for agent in &agents {
+            let energy_ratio = (agent.energy / agent.max_energy).clamp(0.0, 1.0) as f32;
+            let size = (agent.genes.size * 8.0 * (agent.energy / agent.max_energy).max(0.1)) as f32;
+            let death_fade = if agent.is_dying {
+                agent.death_fade.clamp(0.0, 1.0) as f32
+            } else {
+                0.0
+            };
+
+            agent_data.extend_from_slice(&[
+                agent.x as f32,
+                agent.y as f32,
+                agent.dx as f32,
+                agent.dy as f32,
+                size,
+                agent.genes.color_hue as f32,
+                energy_ratio,
+                agent_state_code(&agent.state),
+                agent.spawn_fade.clamp(0.0, 1.0) as f32,
+                death_fade,
+                agent.genes.aggression.clamp(0.0, 1.0) as f32,
+                agent.genes.stealth.clamp(0.0, 1.0) as f32,
+            ]);
+        }
+
+        let mut resource_data = Vec::with_capacity(resources.len() * INSTANCE_FLOATS);
+        for resource in &resources {
+            let energy_ratio = (resource.energy / resource.max_energy).clamp(0.0, 1.0) as f32;
+            let depletion_factor = 1.0 - resource.deplete_fade;
+            let size = (resource.size * 3.8 * depletion_factor.max(0.12)) as f32;
+            let hue = 92.0 + energy_ratio * 46.0;
+
+            resource_data.extend_from_slice(&[
+                resource.x as f32,
+                resource.y as f32,
+                0.0,
+                0.0,
+                size,
+                hue,
+                energy_ratio,
+                0.0,
+                resource.spawn_fade.clamp(0.0, 1.0) as f32,
+                resource.deplete_fade.clamp(0.0, 1.0) as f32,
+                0.0,
+                0.0,
+            ]);
+        }
+
+        let agents_array = unsafe { Float32Array::view(&agent_data) };
+        let resources_array = unsafe { Float32Array::view(&resource_data) };
+
+        if let Err(error) = render_webgpu(
+            webgpu_renderer,
+            &agents_array,
+            agents.len() as u32,
+            &resources_array,
+            resources.len() as u32,
+            time,
+        ) {
+            web_sys::console::error_1(&format!("WebGPU render failed: {:?}", error).into());
         }
     }
 
@@ -589,11 +1041,24 @@ impl WebRenderer {
     }
 
     pub fn get_rendering_mode(&self) -> String {
-        if self.use_webgl {
+        if self.webgpu_renderer.is_some() {
+            "WebGPU".to_string()
+        } else if self.use_webgl {
             "WebGL".to_string()
         } else {
             "Canvas2D".to_string()
         }
+    }
+}
+
+fn agent_state_code(state: &crate::agent::AgentState) -> f32 {
+    match state {
+        crate::agent::AgentState::Seeking => 0.0,
+        crate::agent::AgentState::Hunting => 1.0,
+        crate::agent::AgentState::Feeding => 2.0,
+        crate::agent::AgentState::Reproducing => 3.0,
+        crate::agent::AgentState::Fighting => 4.0,
+        crate::agent::AgentState::Fleeing => 5.0,
     }
 }
 
