@@ -17,7 +17,7 @@ pub struct Simulation {
 
 **Methods:**
 - `new() -> Self` - Create new simulation with default config
-- `new_with_config(config: SimulationConfig) -> Self` - Create simulation with custom config
+- `new_with_config(config: SimulationConfig) -> Self` - Create simulation with custom population and limit config
 - `update()` - Update simulation for one frame
 - `add_agent(x: f64, y: f64)` - Add agent at position
 - `add_resource(x: f64, y: f64)` - Add resource at position
@@ -36,9 +36,11 @@ pub struct SimulationConfig {
     pub max_resources: usize,          // Maximum resources allowed
     pub initial_agents: usize,         // Initial agent count
     pub initial_resources: usize,      // Initial resource count
-    pub resource_spawn_rate: f64,      // Resources per second
+    pub resource_spawn_rate: f64,      // Reserved for automatic spawning
 }
 ```
+
+Initial counts are applied at construction and reset time, clamped to the configured maximums.
 
 ### SimulationStats
 
@@ -65,14 +67,15 @@ pub struct SimulationStats {
 
 ```javascript
 class BattleSimulation {
-    constructor(canvasId?: string) -> Promise<BattleSimulation>
+    constructor(canvas_id?: string)
     
     // Core methods
     update() -> void
-    getStats() -> SimulationStats
-    addAgent(x: number, y: number) -> void
-    addResource(x: number, y: number) -> void
+    get_stats() -> SimulationStats
+    add_agent(x: number, y: number) -> void
+    add_resource(x: number, y: number) -> void
     reset() -> void
+    get_rendering_mode() -> string
 }
 ```
 
@@ -103,9 +106,9 @@ class ParallelProcessor {
     
     // Parallel processing
     initialize() -> Promise<void>
-    isInitialized() -> boolean
-    getWorkerCount() -> number
-    isRayonAvailable() -> boolean
+    is_initialized() -> boolean
+    get_worker_count() -> number
+    is_rayon_available() -> boolean
 }
 ```
 
@@ -119,7 +122,7 @@ async function main() {
     const processor = new ParallelProcessor();
     await processor.initialize();
     
-    if (processor.isRayonAvailable()) {
+    if (processor.is_rayon_available()) {
         console.log("Parallel processing enabled!");
     }
 }
@@ -256,14 +259,17 @@ pub enum AgentStateEnum {
 ```rust
 pub struct EcsWorld {
     pub world: World,
-    pub spatial_grid: SpatialGrid,
     pub canvas_width: f64,
     pub canvas_height: f64,
+    pub max_agents: usize,
+    pub max_resources: usize,
+    pub spatial_grid: SpatialGrid,
 }
 ```
 
 **Methods:**
 - `new(canvas_width: f64, canvas_height: f64) -> Self` - Create new ECS world
+- `new_with_population(canvas_width, canvas_height, max_agents, max_resources, initial_agents, initial_resources) -> Self` - Create an ECS world with explicit limits and initial population
 - `add_agent(x: f64, y: f64)` - Spawn agent at position
 - `add_resource(x: f64, y: f64)` - Spawn resource at position
 - `update_spatial_grid()` - Update spatial partitioning
@@ -276,6 +282,7 @@ pub struct EcsWorld {
 - `get_agents() -> Vec<(Position, Velocity, Energy, Age, AgentState, Genes, Size)>` - Get all agents
 - `get_resources() -> Vec<(Position, Resource, Size)>` - Get all resources
 - `reset()` - Clear all entities
+- `reset_with_population(initial_agents, initial_resources)` - Reset with explicit initial population, clamped to max limits
 
 ### SpatialGrid
 
@@ -390,7 +397,7 @@ try {
 }
 
 // Check parallel processing availability
-if (!processor.isRayonAvailable()) {
+if (!processor.is_rayon_available()) {
     console.warn("Using sequential processing");
 }
 ```
@@ -399,8 +406,8 @@ if (!processor.isRayonAvailable()) {
 
 ### Optimal Settings
 
-- **Web**: 1,000-10,000 agents for 60 FPS
-- **Headless**: 100,000+ agents with speed multipliers
+- **Web**: Tune population size to the browser and rendering mode
+- **Headless**: Use release builds and benchmark with the target scenario
 - **Spatial Grid**: 50px cell size for most simulations
 - **Worker Count**: 4-8 workers for WASM, all cores for native
 
@@ -466,8 +473,8 @@ async function main() {
     
     // Add initial population
     for (let i = 0; i < 100; i++) {
-        simulation.addAgent(Math.random() * 800, Math.random() * 600);
-        simulation.addResource(Math.random() * 800, Math.random() * 600);
+        simulation.add_agent(Math.random() * 800, Math.random() * 600);
+        simulation.add_resource(Math.random() * 800, Math.random() * 600);
     }
     
     // Run simulation
@@ -475,8 +482,8 @@ async function main() {
         simulation.update();
         
         // Get statistics
-        const stats = simulation.getStats();
-        console.log(`Agents: ${stats.agentCount}, Resources: ${stats.resourceCount}`);
+        const stats = simulation.get_stats();
+        console.log(`Agents: ${stats.agent_count}, Resources: ${stats.resource_count}`);
         
         requestAnimationFrame(animate);
     }
@@ -528,4 +535,4 @@ fn custom_movement_system(world: &mut EcsWorld, delta_time: f64) {
         if pos.y > 600.0 { pos.y = 0.0; }
     }
 }
-``` 
+```

@@ -83,7 +83,7 @@ impl Resource {
                     self.energy = self.max_energy;
                 }
             }
-            
+
             // Stop growing once at max energy
             if self.energy >= self.max_energy {
                 self.target_energy = self.max_energy; // Lock target to max

@@ -41,7 +41,7 @@ echo ""
 
 # Build the simulation
 echo "Building simulation..."
-cargo build --bin headless --target x86_64-apple-darwin --release
+cargo build --bin headless --release
 
 if [ $? -ne 0 ]; then
     echo "❌ Build failed!"
@@ -53,7 +53,7 @@ echo ""
 
 # Run the simulation
 echo "Starting simulation..."
-./target/x86_64-apple-darwin/release/headless "$DURATION_MINUTES" "$SPEED_MULTIPLIER" "$INITIAL_AGENTS" "$INITIAL_RESOURCES" "$MAX_AGENTS" "$MAX_RESOURCES"
+./target/release/headless "$DURATION_MINUTES" "$SPEED_MULTIPLIER" "$INITIAL_AGENTS" "$INITIAL_RESOURCES" "$MAX_AGENTS" "$MAX_RESOURCES"
 
 echo ""
-echo "=== Simulation Complete ===" 
+echo "=== Simulation Complete ==="

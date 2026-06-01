@@ -2,6 +2,9 @@
 name = "battleo"
 version = "0.1.0"
 edition = "2021"
+description = "Evolutionary agent simulation with native headless and WebAssembly browser modes"
+repository = "https://github.com/rgilks/battleo"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -35,9 +38,7 @@ web-sys = { version = "0.3", features = [
 ] }
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
+wasm-bindgen-rayon = { version = "1.3", optional = true }
 
-[package.metadata.wasm-pack.profile.release.target.'cfg(target_arch = "wasm32")']
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory"]
-
-[package.metadata.wasm-pack.profile.dev.target.'cfg(target_arch = "wasm32")']
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory"]
+[features]
+wasm-bindgen-rayon = ["dep:wasm-bindgen-rayon"]

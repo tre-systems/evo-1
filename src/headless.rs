@@ -1,4 +1,4 @@
-use crate::simulation::{Simulation, SimulationStats};
+use crate::simulation::{Simulation, SimulationConfig, SimulationStats};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -80,35 +80,30 @@ pub struct HeadlessSimulation {
 impl HeadlessSimulation {
     pub fn new(config: HeadlessConfig) -> Self {
         // Initialize rayon for parallel processing
-        use rayon::ThreadPoolBuilder;
         use crate::simulation;
-        
-        // Set up rayon thread pool
-        ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
+
+        let thread_count = num_cpus::get();
+        if rayon::ThreadPoolBuilder::new()
+            .num_threads(thread_count)
             .build_global()
-            .expect("Failed to initialize rayon thread pool");
-        
+            .is_ok()
+        {
+            println!("Initialized rayon with {thread_count} threads");
+        } else {
+            println!("Rayon thread pool already initialized; reusing global pool");
+        }
+
         // Mark rayon as available
         simulation::set_rayon_available(true);
-        
-        println!("Initialized rayon with {} threads", num_cpus::get());
-        
-        let mut simulation = Simulation::new();
-        
-        // Spawn initial population
-        for _ in 0..config.initial_agents {
-            let x = rand::random::<f64>() * 1000.0;
-            let y = rand::random::<f64>() * 800.0;
-            simulation.add_agent(x, y);
-        }
-        
-        for _ in 0..config.initial_resources {
-            let x = rand::random::<f64>() * 1000.0;
-            let y = rand::random::<f64>() * 800.0;
-            simulation.add_resource(x, y);
-        }
-        
+
+        let simulation = Simulation::new_with_config(SimulationConfig {
+            initial_agents: config.initial_agents,
+            initial_resources: config.initial_resources,
+            max_agents: config.max_agents,
+            max_resources: config.max_resources,
+            ..SimulationConfig::default()
+        });
+
         Self {
             simulation,
             config,
@@ -118,11 +113,18 @@ impl HeadlessSimulation {
 
     pub fn run(&mut self) -> SimulationDiagnostics {
         let start_time = std::time::Instant::now();
-        let target_steps = (self.config.duration_minutes * 60.0 * 60.0 * self.config.speed_multiplier) as usize;
+        let target_steps =
+            (self.config.duration_minutes * 60.0 * 60.0 * self.config.speed_multiplier) as usize;
 
-        println!("Starting headless simulation with {}x speed multiplier", self.config.speed_multiplier);
-        println!("Target duration: {:.1} minutes", self.config.duration_minutes);
-        println!("Target steps: {}", target_steps);
+        println!(
+            "Starting headless simulation with {}x speed multiplier",
+            self.config.speed_multiplier
+        );
+        println!(
+            "Target duration: {:.2} minutes",
+            self.config.duration_minutes
+        );
+        println!("Target steps: {target_steps}");
 
         let mut step_count = 0;
         while step_count < target_steps {
@@ -134,14 +136,15 @@ impl HeadlessSimulation {
                 let progress = (step_count as f64 / target_steps as f64) * 100.0;
                 let elapsed = start_time.elapsed().as_secs_f64();
                 let steps_per_sec = step_count as f64 / elapsed;
-                println!("Progress: {:.1}% ({}/{} steps, {:.0} steps/sec)", 
-                    progress, step_count, target_steps, steps_per_sec);
+                println!(
+                    "Progress: {progress:.1}% ({step_count}/{target_steps} steps, {steps_per_sec:.0} steps/sec)"
+                );
             }
 
             // Check for early termination
             let stats = self.simulation.get_stats();
             if stats.agent_count == 0 || stats.agent_count > self.config.max_agents {
-                println!("Early termination at step {}", step_count);
+                println!("Early termination at step {step_count}");
                 break;
             }
         }
@@ -161,25 +164,25 @@ impl HeadlessSimulation {
 
     fn calculate_diagnostics(&mut self) {
         let stats = &self.diagnostics.final_stats;
-        
+
         // Check for extinction/explosion
         self.diagnostics.extinction_occurred = stats.agent_count == 0;
         self.diagnostics.population_explosion = stats.agent_count > self.config.max_agents;
-        
+
         // Calculate average generations
         let agents = self.simulation.get_agents();
         if !agents.is_empty() {
             let total_generations: u32 = agents.iter().map(|a| a.generation).sum();
             self.diagnostics.average_generations = total_generations as f64 / agents.len() as f64;
         }
-        
+
         // Calculate reproduction/death stats
         let initial_agents = self.config.initial_agents;
         let current_agents = stats.agent_count;
         let total_born = current_agents.saturating_sub(initial_agents);
         self.diagnostics.total_reproductions = total_born;
         self.diagnostics.total_deaths = initial_agents.saturating_sub(current_agents) + total_born;
-        
+
         // Calculate quality score
         self.diagnostics.simulation_quality_score = self.calculate_quality_score();
     }
@@ -189,16 +192,17 @@ impl HeadlessSimulation {
         let stats = &self.diagnostics.final_stats;
 
         // Duration completion (20%)
-        let duration_ratio = self.diagnostics.duration_seconds / (self.config.duration_minutes * 60.0);
+        let duration_ratio =
+            self.diagnostics.duration_seconds / (self.config.duration_minutes * 60.0);
         score += duration_ratio * 0.2;
 
         // Population health (25%)
         let final_agents = stats.agent_count;
         let target_agents = self.config.initial_agents;
         let agent_ratio = final_agents as f64 / target_agents as f64;
-        if agent_ratio >= 0.5 && agent_ratio <= 2.0 {
+        if (0.5..=2.0).contains(&agent_ratio) {
             score += 0.25;
-        } else if agent_ratio >= 0.3 && agent_ratio <= 3.0 {
+        } else if (0.3..=3.0).contains(&agent_ratio) {
             score += 0.15;
         }
 
@@ -223,7 +227,7 @@ impl HeadlessSimulation {
             score -= 0.3;
         }
 
-        score.max(0.0).min(1.0)
+        score.clamp(0.0, 1.0)
     }
 
     pub fn get_current_stats(&self) -> SimulationStats {
@@ -239,15 +243,36 @@ impl HeadlessSimulation {
 
         println!("\n=== Final Population ===");
         println!("Final agents: {}", self.diagnostics.final_stats.agent_count);
-        println!("Final resources: {}", self.diagnostics.final_stats.resource_count);
-        println!("Total energy: {:.1}", self.diagnostics.final_stats.total_energy);
+        println!(
+            "Final resources: {}",
+            self.diagnostics.final_stats.resource_count
+        );
+        println!(
+            "Total energy: {:.1}",
+            self.diagnostics.final_stats.total_energy
+        );
 
         println!("\n=== Simulation Quality ===");
-        println!("Quality score: {:.3}", self.diagnostics.simulation_quality_score);
-        println!("Extinction occurred: {}", self.diagnostics.extinction_occurred);
-        println!("Population explosion: {}", self.diagnostics.population_explosion);
-        println!("Average generations: {:.1}", self.diagnostics.average_generations);
-        println!("Total reproductions: {}", self.diagnostics.total_reproductions);
+        println!(
+            "Quality score: {:.3}",
+            self.diagnostics.simulation_quality_score
+        );
+        println!(
+            "Extinction occurred: {}",
+            self.diagnostics.extinction_occurred
+        );
+        println!(
+            "Population explosion: {}",
+            self.diagnostics.population_explosion
+        );
+        println!(
+            "Average generations: {:.1}",
+            self.diagnostics.average_generations
+        );
+        println!(
+            "Total reproductions: {}",
+            self.diagnostics.total_reproductions
+        );
         println!("Total deaths: {}", self.diagnostics.total_deaths);
     }
-} 
+}

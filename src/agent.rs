@@ -305,14 +305,10 @@ impl Agent {
             }
         }
 
-        if let Some((tx, ty, is_agent, _target_type)) = best_target {
+        if let Some((tx, ty, _is_agent, _target_type)) = best_target {
             self.target_x = Some(tx);
             self.target_y = Some(ty);
-            self.state = if is_agent {
-                AgentState::Hunting
-            } else {
-                AgentState::Hunting
-            };
+            self.state = AgentState::Hunting;
         } else {
             // Random movement if no targets
             self.random_movement();

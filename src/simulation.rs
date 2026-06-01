@@ -1,7 +1,7 @@
-use crate::ecs::EcsWorld;
 use crate::agent::Agent;
-use crate::resource::Resource;
+use crate::ecs::EcsWorld;
 use crate::genes::Genes;
+use crate::resource::Resource;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -38,6 +38,14 @@ pub struct SimulationStats {
     pub max_generation: u32,
     pub total_kills: u32,
     pub average_fitness: f64,
+    // Debug stats for resource consumption
+    pub total_resource_energy: f64,
+    pub average_resource_energy: f64,
+    pub resources_being_consumed: usize,
+    pub consumption_events_this_frame: usize,
+    pub total_consumption_events: usize,
+    pub average_agent_energy: f64,
+    pub agents_with_targets: usize,
 }
 
 impl Default for SimulationStats {
@@ -55,6 +63,14 @@ impl Default for SimulationStats {
             max_generation: 0,
             total_kills: 0,
             average_fitness: 0.0,
+            // Debug stats for resource consumption
+            total_resource_energy: 0.0,
+            average_resource_energy: 0.0,
+            resources_being_consumed: 0,
+            consumption_events_this_frame: 0,
+            total_consumption_events: 0,
+            average_agent_energy: 0.0,
+            agents_with_targets: 0,
         }
     }
 }
@@ -83,7 +99,7 @@ impl Default for SimulationConfig {
             max_resources: 2000,
             initial_agents: 500,
             initial_resources: 500,
-            resource_spawn_rate: 0.2,
+            resource_spawn_rate: 1.0, // Reserved for automatic resource spawning
         }
     }
 }
@@ -99,10 +115,23 @@ pub struct Simulation {
     resource_spawn_timer: f64,
 }
 
+impl Default for Simulation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Simulation {
     pub fn new() -> Self {
         let config = SimulationConfig::default();
-        let ecs_world = EcsWorld::new(config.width, config.height);
+        let ecs_world = EcsWorld::new_with_population(
+            config.width,
+            config.height,
+            config.max_agents,
+            config.max_resources,
+            config.initial_agents,
+            config.initial_resources,
+        );
 
         Self {
             ecs_world,
@@ -113,7 +142,14 @@ impl Simulation {
     }
 
     pub fn new_with_config(config: SimulationConfig) -> Self {
-        let ecs_world = EcsWorld::new(config.width, config.height);
+        let ecs_world = EcsWorld::new_with_population(
+            config.width,
+            config.height,
+            config.max_agents,
+            config.max_resources,
+            config.initial_agents,
+            config.initial_resources,
+        );
 
         Self {
             ecs_world,
@@ -124,7 +160,7 @@ impl Simulation {
     }
 
     pub fn update(&mut self) {
-        let delta_time = 1.0 / 60.0;
+        let delta_time = 10.0 / 60.0; // 10x faster simulation
         self.time += delta_time;
         self.resource_spawn_timer += delta_time;
 
@@ -138,6 +174,9 @@ impl Simulation {
             self.update_resources_sequential(delta_time);
         }
 
+        // Handle resource consumption (agents eating resources)
+        self.ecs_world.handle_consumption();
+
         // Update agents (can be parallelized)
         if is_rayon_available() {
             self.update_agents_parallel(delta_time);
@@ -149,157 +188,147 @@ impl Simulation {
         self.ecs_world.handle_death();
         self.ecs_world.handle_reproduction();
 
-        // Spawn new resources
-        if self.resource_spawn_timer >= 1.0 / self.config.resource_spawn_rate {
-            if self.ecs_world.get_resource_count() < self.config.max_resources {
-                self.ecs_world.spawn_resource();
-            }
-            self.resource_spawn_timer = 0.0;
-        }
+        // Handle resource depletion
+        self.ecs_world.handle_resource_depletion();
+
+        // Disable automatic resource spawning - let resources be finite
+        // if self.resource_spawn_timer >= 0.1 / self.config.resource_spawn_rate {
+        //     if self.ecs_world.get_resource_count() < self.config.max_resources {
+        //         self.ecs_world.spawn_resource();
+        //     }
+        //     self.resource_spawn_timer = 0.0;
+        // }
     }
 
     fn update_resources_parallel(&mut self, delta_time: f64) {
         // Collect all resource data for parallel processing
-        let resource_data: Vec<_> = self.ecs_world.world
+        let resource_data: Vec<_> = self
+            .ecs_world
+            .world
             .query::<&crate::ecs::Resource>()
             .iter()
-            .filter(|(entity, _)| self.ecs_world.world.get::<&crate::ecs::ResourceTag>(*entity).is_ok())
+            .filter(|(entity, _)| {
+                self.ecs_world
+                    .world
+                    .get::<&crate::ecs::ResourceTag>(*entity)
+                    .is_ok()
+            })
             .map(|(entity, resource)| (entity, resource.clone()))
             .collect();
 
         // Calculate updates in parallel
-        let updates: Vec<_> = resource_data.par_iter().map(|(entity, resource)| {
-            let mut updated_resource = resource.clone();
-            updated_resource.update(delta_time);
-            (*entity, updated_resource)
-        }).collect();
+        let updates: Vec<_> = resource_data
+            .par_iter()
+            .map(|(entity, resource)| {
+                let mut updated_resource = resource.clone();
+                updated_resource.update(delta_time);
+                (*entity, updated_resource)
+            })
+            .collect();
 
         // Apply updates sequentially (to avoid borrowing issues)
         for (entity, updated_resource) in updates {
-            if let Ok(mut resource) = self.ecs_world.world.get::<&mut crate::ecs::Resource>(entity) {
+            if let Ok(mut resource) = self
+                .ecs_world
+                .world
+                .get::<&mut crate::ecs::Resource>(entity)
+            {
                 *resource = updated_resource;
             }
         }
     }
 
     fn update_resources_sequential(&mut self, delta_time: f64) {
-        for (_, resource) in self.ecs_world.world.query_mut::<&mut crate::ecs::Resource>() {
+        for (_, resource) in self
+            .ecs_world
+            .world
+            .query_mut::<&mut crate::ecs::Resource>()
+        {
             resource.update(delta_time);
         }
     }
 
     fn update_agents_parallel(&mut self, delta_time: f64) {
-        // Collect all resources for efficient lookup (shared read-only data)
-        let resources: Vec<_> = self.ecs_world.world
-            .query::<(&crate::ecs::Position, &crate::ecs::Resource)>()
+        // Use the existing ECS world's optimized update method
+        // This uses the spatial grid for efficient neighbor lookups
+        let agent_entities: Vec<_> = self
+            .ecs_world
+            .world
+            .query::<(
+                &crate::ecs::Position,
+                &crate::ecs::Velocity,
+                &crate::ecs::Energy,
+                &crate::ecs::Age,
+                &crate::ecs::AgentState,
+                &crate::ecs::Genes,
+            )>()
             .iter()
-            .filter(|(entity, _)| self.ecs_world.world.get::<&crate::ecs::ResourceTag>(*entity).is_ok())
-            .map(|(_, (pos, res))| (pos.x, pos.y, res.clone()))
-            .collect();
-
-        // Collect all agent data for parallel processing
-        let agent_data: Vec<_> = self.ecs_world.world
-            .query::<(&crate::ecs::Position, &crate::ecs::Velocity, &crate::ecs::Energy, &crate::ecs::Age, &crate::ecs::AgentState, &crate::ecs::Genes)>()
-            .iter()
-            .filter(|(entity, _)| self.ecs_world.world.get::<&crate::ecs::AgentTag>(*entity).is_ok())
-            .map(|(entity, (pos, vel, energy, age, state, genes))| {
-                (entity, pos.clone(), vel.clone(), energy.clone(), age.clone(), state.clone(), genes.clone())
+            .filter(|(entity, _)| {
+                self.ecs_world
+                    .world
+                    .get::<&crate::ecs::AgentTag>(*entity)
+                    .is_ok()
             })
+            .map(|(entity, _)| entity)
             .collect();
 
-        // Calculate updates in parallel using rayon
-        let updates: Vec<_> = agent_data.par_iter().map(|(entity, pos, vel, energy, age, state, genes)| {
-            // Calculate new position
-            let new_x = (pos.x + vel.dx * delta_time).max(0.0).min(self.config.width);
-            let new_y = (pos.y + vel.dy * delta_time).max(0.0).min(self.config.height);
-            
-            // Calculate energy consumption
-            let energy_consumption = genes.metabolism * delta_time;
-            let new_energy = (energy.current - energy_consumption).max(0.0);
-            
-            // Calculate age
-            let new_age = age.value + delta_time;
-            
-            // Find nearest resource for AI behavior
-            let mut nearest_distance = f64::INFINITY;
-            let mut nearest_resource = None;
-            
-            for (res_x, res_y, res) in &resources {
-                let distance = ((new_x - res_x).powi(2) + (new_y - res_y).powi(2)).sqrt();
-                if distance < nearest_distance && distance <= genes.sense_range {
-                    nearest_distance = distance;
-                    nearest_resource = Some((*res_x, *res_y, res.clone()));
-                }
-            }
-            
-            // Calculate new velocity based on AI behavior
-            let mut new_vel_x = vel.dx;
-            let mut new_vel_y = vel.dy;
-            
-            if let Some((res_x, res_y, _)) = nearest_resource {
-                // Move towards resource
-                let dx = res_x - new_x;
-                let dy = res_y - new_y;
-                let distance = (dx.powi(2) + dy.powi(2)).sqrt();
-                
-                if distance > 0.0 {
-                    new_vel_x = (dx / distance) * genes.speed;
-                    new_vel_y = (dy / distance) * genes.speed;
-                }
-            } else {
-                // Random movement if no resource nearby
-                let angle = (age.value * 0.1) % (2.0 * std::f64::consts::PI);
-                new_vel_x = angle.cos() * genes.speed * 0.5;
-                new_vel_y = angle.sin() * genes.speed * 0.5;
-            }
-            
-            (*entity, new_x, new_y, new_vel_x, new_vel_y, new_energy, new_age)
-        }).collect();
-
-        // Apply updates sequentially (to avoid borrowing issues)
-        for (entity, new_x, new_y, new_vel_x, new_vel_y, new_energy, new_age) in updates {
-            if let Ok(mut pos) = self.ecs_world.world.get::<&mut crate::ecs::Position>(entity) {
-                pos.x = new_x;
-                pos.y = new_y;
-            }
-            if let Ok(mut vel) = self.ecs_world.world.get::<&mut crate::ecs::Velocity>(entity) {
-                vel.dx = new_vel_x;
-                vel.dy = new_vel_y;
-            }
-            if let Ok(mut energy) = self.ecs_world.world.get::<&mut crate::ecs::Energy>(entity) {
-                energy.current = new_energy;
-            }
-            if let Ok(mut age) = self.ecs_world.world.get::<&mut crate::ecs::Age>(entity) {
-                age.value = new_age;
-            }
+        // Update agents sequentially using the optimized ECS method
+        for entity in agent_entities {
+            self.ecs_world.update_single_agent_optimized(
+                entity,
+                delta_time,
+                self.config.width,
+                self.config.height,
+            );
         }
     }
 
     fn update_agents_sequential(&mut self, delta_time: f64) {
         // Collect all resources for efficient lookup
-        let resources: Vec<_> = self.ecs_world.world
+        let resources: Vec<_> = self
+            .ecs_world
+            .world
             .query::<(&crate::ecs::Position, &crate::ecs::Resource)>()
             .iter()
-            .filter(|(entity, _)| self.ecs_world.world.get::<&crate::ecs::ResourceTag>(*entity).is_ok())
+            .filter(|(entity, _)| {
+                self.ecs_world
+                    .world
+                    .get::<&crate::ecs::ResourceTag>(*entity)
+                    .is_ok()
+            })
             .map(|(_, (pos, res))| (pos.x, pos.y, res.clone()))
             .collect();
 
         // Get all agent entities that need updating
-        let agent_entities: Vec<_> = self.ecs_world.world
-            .query::<(&crate::ecs::Position, &crate::ecs::Velocity, &crate::ecs::Energy, &crate::ecs::Age, &crate::ecs::AgentState, &crate::ecs::Genes)>()
+        let agent_entities: Vec<_> = self
+            .ecs_world
+            .world
+            .query::<(
+                &crate::ecs::Position,
+                &crate::ecs::Velocity,
+                &crate::ecs::Energy,
+                &crate::ecs::Age,
+                &crate::ecs::AgentState,
+                &crate::ecs::Genes,
+            )>()
             .iter()
-            .filter(|(entity, _)| self.ecs_world.world.get::<&crate::ecs::AgentTag>(*entity).is_ok())
+            .filter(|(entity, _)| {
+                self.ecs_world
+                    .world
+                    .get::<&crate::ecs::AgentTag>(*entity)
+                    .is_ok()
+            })
             .map(|(entity, _)| entity)
             .collect();
 
         // Update agents sequentially
         for entity in agent_entities {
             self.ecs_world.update_single_agent(
-                entity, 
-                delta_time, 
-                &resources, 
-                self.config.width, 
-                self.config.height
+                entity,
+                delta_time,
+                &resources,
+                self.config.width,
+                self.config.height,
             );
         }
     }
@@ -317,7 +346,8 @@ impl Simulation {
     }
 
     pub fn reset(&mut self) {
-        self.ecs_world.reset();
+        self.ecs_world
+            .reset_with_population(self.config.initial_agents, self.config.initial_resources);
         self.time = 0.0;
         self.resource_spawn_timer = 0.0;
     }
@@ -340,22 +370,88 @@ impl Simulation {
                 max_generation: 0,
                 total_kills: 0,
                 average_fitness: 0.0,
+                // Debug stats for resource consumption
+                total_resource_energy: 0.0,
+                average_resource_energy: 0.0,
+                resources_being_consumed: 0,
+                consumption_events_this_frame: 0,
+                total_consumption_events: 0,
+                average_agent_energy: 0.0,
+                agents_with_targets: 0,
             };
         }
 
         // Get all agents for statistics
         let agents = self.ecs_world.get_agents();
 
-        let total_energy: f64 = agents.iter().map(|(_, _, energy, _, _, _, _)| energy.current).sum();
-        let average_age: f64 = agents.iter().map(|(_, _, _, age, _, _, _)| age.value).sum::<f64>() / agent_count as f64;
-        let average_speed: f64 = agents.iter().map(|(_, _, _, _, _, genes, _)| genes.speed).sum::<f64>() / agent_count as f64;
-        let average_size: f64 = agents.iter().map(|(_, _, _, _, _, genes, _)| genes.size).sum::<f64>() / agent_count as f64;
-        let average_aggression: f64 = agents.iter().map(|(_, _, _, _, _, genes, _)| genes.aggression).sum::<f64>() / agent_count as f64;
-        let average_sense_range: f64 = agents.iter().map(|(_, _, _, _, _, genes, _)| genes.sense_range).sum::<f64>() / agent_count as f64;
-        let average_energy_efficiency: f64 = agents.iter().map(|(_, _, _, _, _, genes, _)| genes.energy_efficiency).sum::<f64>() / agent_count as f64;
-        let max_generation = agents.iter().map(|(_, _, _, _, state, _, _)| state.generation).max().unwrap_or(0);
-        let total_kills: u32 = agents.iter().map(|(_, _, _, _, state, _, _)| state.kills).sum();
-        let average_fitness: f64 = agents.iter().map(|(_, _, energy, _, _, _, _)| energy.current / energy.max).sum::<f64>() / agent_count as f64;
+        let total_energy: f64 = agents
+            .iter()
+            .map(|(_, _, energy, _, _, _, _)| energy.current)
+            .sum();
+        let average_age: f64 = agents
+            .iter()
+            .map(|(_, _, _, age, _, _, _)| age.value)
+            .sum::<f64>()
+            / agent_count as f64;
+        let average_speed: f64 = agents
+            .iter()
+            .map(|(_, _, _, _, _, genes, _)| genes.speed)
+            .sum::<f64>()
+            / agent_count as f64;
+        let average_size: f64 = agents
+            .iter()
+            .map(|(_, _, _, _, _, genes, _)| genes.size)
+            .sum::<f64>()
+            / agent_count as f64;
+        let average_aggression: f64 = agents
+            .iter()
+            .map(|(_, _, _, _, _, genes, _)| genes.aggression)
+            .sum::<f64>()
+            / agent_count as f64;
+        let average_sense_range: f64 = agents
+            .iter()
+            .map(|(_, _, _, _, _, genes, _)| genes.sense_range)
+            .sum::<f64>()
+            / agent_count as f64;
+        let average_energy_efficiency: f64 = agents
+            .iter()
+            .map(|(_, _, _, _, _, genes, _)| genes.energy_efficiency)
+            .sum::<f64>()
+            / agent_count as f64;
+        let max_generation = agents
+            .iter()
+            .map(|(_, _, _, _, state, _, _)| state.generation)
+            .max()
+            .unwrap_or(0);
+        let total_kills: u32 = agents
+            .iter()
+            .map(|(_, _, _, _, state, _, _)| state.kills)
+            .sum();
+        let average_fitness: f64 = agents
+            .iter()
+            .map(|(_, _, energy, _, _, _, _)| energy.current / energy.max)
+            .sum::<f64>()
+            / agent_count as f64;
+
+        // Get resource statistics
+        let resources = self.ecs_world.get_resources();
+        let total_resource_energy: f64 = resources
+            .iter()
+            .map(|(_, resource, _)| resource.energy)
+            .sum();
+        let average_resource_energy = if resource_count > 0 {
+            total_resource_energy / resource_count as f64
+        } else {
+            0.0
+        };
+
+        // Count agents with targets
+        let agents_with_targets = agents
+            .iter()
+            .filter(|(_, _, _, _, state, _, _)| {
+                state.target_x.is_some() || state.target_y.is_some()
+            })
+            .count();
 
         SimulationStats {
             agent_count,
@@ -370,6 +466,14 @@ impl Simulation {
             max_generation,
             total_kills,
             average_fitness,
+            // Debug stats for resource consumption
+            total_resource_energy,
+            average_resource_energy,
+            resources_being_consumed: 0, // Will be set by ECS world
+            consumption_events_this_frame: self.ecs_world.consumption_events_this_frame,
+            total_consumption_events: self.ecs_world.total_consumption_events,
+            average_agent_energy: total_energy / agent_count as f64,
+            agents_with_targets,
         }
     }
 
@@ -412,7 +516,9 @@ impl Simulation {
                     crate::ecs::AgentStateEnum::Seeking => crate::agent::AgentState::Seeking,
                     crate::ecs::AgentStateEnum::Hunting => crate::agent::AgentState::Hunting,
                     crate::ecs::AgentStateEnum::Feeding => crate::agent::AgentState::Feeding,
-                    crate::ecs::AgentStateEnum::Reproducing => crate::agent::AgentState::Reproducing,
+                    crate::ecs::AgentStateEnum::Reproducing => {
+                        crate::agent::AgentState::Reproducing
+                    }
                     crate::ecs::AgentStateEnum::Fighting => crate::agent::AgentState::Fighting,
                     crate::ecs::AgentStateEnum::Fleeing => crate::agent::AgentState::Fleeing,
                 },
@@ -454,4 +560,4 @@ impl Simulation {
     pub fn get_config(&self) -> &SimulationConfig {
         &self.config
     }
-} 
+}

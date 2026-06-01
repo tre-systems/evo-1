@@ -2,10 +2,6 @@
 use std::env;
 
 #[cfg(not(target_arch = "wasm32"))]
-use battleo::headless::{HeadlessConfig, HeadlessSimulation};
-use std::time::Instant;
-
-#[cfg(not(target_arch = "wasm32"))]
 fn main() {
     use battleo::headless::{HeadlessConfig, HeadlessSimulation};
     use std::time::Instant;
@@ -39,7 +35,7 @@ fn main() {
     };
 
     println!("Configuration:");
-    println!("  Duration: {:.1} minutes", config.duration_minutes);
+    println!("  Duration: {:.2} minutes", config.duration_minutes);
     println!("  Speed multiplier: {}x", config.speed_multiplier);
     println!("  Initial agents: {}", config.initial_agents);
     println!("  Initial resources: {}", config.initial_resources);

@@ -15,8 +15,9 @@ A high-performance evolutionary simulation framework built in Rust with WebAssem
 
 ### Prerequisites
 
-- Rust (nightly for WASM builds)
-- wasm-pack: `cargo install wasm-pack`
+- Rust stable for native builds
+- Nightly Rust for threaded WASM builds
+- wasm-pack for browser packages: `cargo install wasm-pack`
 
 ### Build and Run
 
@@ -24,12 +25,14 @@ A high-performance evolutionary simulation framework built in Rust with WebAssem
 
 ```bash
 # Build with parallel processing support
-RUSTUP_TOOLCHAIN=nightly wasm-pack build --target web --features wasm-bindgen-rayon
+RUSTUP_TOOLCHAIN=nightly wasm-pack build --target web --out-dir pkg . --features wasm-bindgen-rayon -Z unstable-options
 
-# Serve and open in browser
-python3 -m http.server 8000
+# Serve with SharedArrayBuffer headers and open in browser
+python3 server.py
 # Open http://localhost:8000
 ```
+
+The `-Z unstable-options` passthrough is required by current Cargo/wasm-pack combinations when wasm-pack forwards its output directory to `cargo build`.
 
 #### Headless Mode (Native)
 
@@ -103,7 +106,7 @@ Curated collection of interesting evolution scenarios:
 Both scripts automatically:
 
 - ✅ **Build** the optimized binary
-- ✅ **Initialize** rayon with 10 threads
+- ✅ **Initialize** rayon with the available CPU threads
 - ✅ **Run** the simulation
 - ✅ **Display** detailed results
 - ✅ **Show** evolution metrics
@@ -131,6 +134,7 @@ See [docs/README.md](docs/README.md) for complete documentation covering:
 
 - **Implementation Guide** - Parallel processing, ECS architecture, and WebGL rendering
 - **API Reference** - Complete API documentation
+- **Maintenance Notes** - Checks, browser smoke tests, live-site status, and branch cleanup guidance
 
 ## Development
 
@@ -144,7 +148,7 @@ cargo build
 cargo build --release
 
 # WASM build with parallel processing
-RUSTUP_TOOLCHAIN=nightly wasm-pack build --target web --features wasm-bindgen-rayon
+RUSTUP_TOOLCHAIN=nightly wasm-pack build --target web --out-dir pkg . --features wasm-bindgen-rayon -Z unstable-options
 
 # Run tests
 cargo test
@@ -164,15 +168,15 @@ let config = SimulationConfig {
     max_resources: 2000,
     initial_agents: 500,
     initial_resources: 500,
-    resource_spawn_rate: 0.2,
+    resource_spawn_rate: 1.0, // Reserved for automatic resource spawning
 };
 ```
 
+`initial_agents` and `initial_resources` are applied when the simulation is created or reset. If they exceed the configured maximums, they are clamped to `max_agents` and `max_resources`.
+
 ## Performance
 
-- **Native**: 100,000+ agents at 60 FPS
-- **WASM**: 10,000+ agents at 60 FPS with parallel processing
-- **Headless**: 1,000,000+ simulation steps per second
+BattleO has native and WASM execution paths, with rayon available for native headless runs and wasm-bindgen-rayon available for browser builds. Actual throughput depends heavily on population size, browser support for SharedArrayBuffer, and whether the threaded WASM build is available.
 
 ## Browser Support
 

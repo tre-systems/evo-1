@@ -72,6 +72,14 @@ impl BattleSimulation {
     pub fn reset(&mut self) {
         self.simulation.reset();
     }
+
+    pub fn get_rendering_mode(&self) -> String {
+        if let Some(renderer) = &self.renderer {
+            renderer.get_rendering_mode()
+        } else {
+            "No rendering (headless)".to_string()
+        }
+    }
 }
 
 // ============================================================================
@@ -83,6 +91,9 @@ impl BattleSimulation {
 pub struct ParallelProcessor {
     initialized: bool,
     worker_count: usize,
+    #[wasm_bindgen(skip)]
+    #[allow(dead_code)]
+    closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(JsValue)>>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -95,6 +106,7 @@ impl ParallelProcessor {
         Self {
             initialized: false,
             worker_count,
+            closure: None,
         }
     }
 
@@ -113,22 +125,33 @@ impl ParallelProcessor {
             );
 
             let worker_count = self.worker_count;
-            let closure = Closure::wrap(Box::new(move |result: JsValue| match result.as_f64() {
-                Some(_) => {
-                    web_sys::console::log_1(
-                        &format!("WASM thread pool initialized with {} workers", worker_count)
+            let closure = Closure::wrap(Box::new(move |result: JsValue| {
+                web_sys::console::log_1(&format!("Thread pool init result: {:?}", result).into());
+                match result.as_f64() {
+                    Some(_) => {
+                        web_sys::console::log_1(
+                            &format!("WASM thread pool initialized with {} workers", worker_count)
+                                .into(),
+                        );
+                        simulation::set_rayon_available(true);
+                    }
+                    None => {
+                        web_sys::console::warn_1(
+                            &format!(
+                                "Failed to initialize WASM thread pool. Result: {:?}",
+                                result
+                            )
                             .into(),
-                    );
-                    simulation::set_rayon_available(true);
-                }
-                None => {
-                    web_sys::console::warn_1(&"Failed to initialize WASM thread pool".into());
-                    simulation::set_rayon_available(false);
+                        );
+                        simulation::set_rayon_available(false);
+                    }
                 }
             }) as Box<dyn FnMut(JsValue)>);
 
+            // Store the closure so it doesn't get dropped
+            self.closure = Some(closure);
             self.initialized = true;
-            init_thread_pool(self.worker_count).then(&closure)
+            init_thread_pool(self.worker_count).then(&self.closure.as_ref().unwrap())
         }
 
         #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
@@ -178,11 +201,12 @@ impl ParallelProcessor {
 // UTILITIES
 // ============================================================================
 
+#[cfg(target_arch = "wasm32")]
 fn get_optimal_worker_count() -> usize {
     #[cfg(target_arch = "wasm32")]
     {
-        // Simple fallback for WASM - use 4 workers
-        4
+        // Use fewer workers for testing - start with 2
+        2
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -207,32 +231,20 @@ pub fn init_panic_hook() {
 pub struct HeadlessSimulation {
     simulation: simulation::Simulation,
     config: headless::HeadlessConfig,
-    diagnostics: headless::SimulationDiagnostics,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl HeadlessSimulation {
     pub fn new(config: headless::HeadlessConfig) -> Self {
-        let mut simulation = simulation::Simulation::new();
+        let simulation = simulation::Simulation::new_with_config(simulation::SimulationConfig {
+            initial_agents: config.initial_agents,
+            initial_resources: config.initial_resources,
+            max_agents: config.max_agents,
+            max_resources: config.max_resources,
+            ..simulation::SimulationConfig::default()
+        });
 
-        // Spawn initial population
-        for _ in 0..config.initial_agents {
-            let x = rand::random::<f64>() * 1000.0;
-            let y = rand::random::<f64>() * 800.0;
-            simulation.add_agent(x, y);
-        }
-
-        for _ in 0..config.initial_resources {
-            let x = rand::random::<f64>() * 1000.0;
-            let y = rand::random::<f64>() * 800.0;
-            simulation.add_resource(x, y);
-        }
-
-        Self {
-            simulation,
-            config,
-            diagnostics: headless::SimulationDiagnostics::default(),
-        }
+        Self { simulation, config }
     }
 
     pub fn run(&mut self) -> headless::SimulationDiagnostics {
@@ -273,9 +285,27 @@ mod tests {
     }
 
     #[test]
+    fn test_simulation_config_controls_initial_population() {
+        let config = simulation::SimulationConfig {
+            initial_agents: 12,
+            initial_resources: 34,
+            max_agents: 20,
+            max_resources: 40,
+            ..simulation::SimulationConfig::default()
+        };
+
+        let sim = simulation::Simulation::new_with_config(config);
+        let stats = sim.get_stats();
+
+        assert_eq!(stats.agent_count, 12);
+        assert_eq!(stats.resource_count, 34);
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    #[test]
     fn test_parallel_processing() {
         let mut processor = ParallelProcessor::new();
-        processor.initialize();
+        let _ = processor.initialize();
 
         // Test that rayon is available after initialization
         assert!(processor.is_rayon_available() || !processor.is_initialized());

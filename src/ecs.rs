@@ -49,6 +49,7 @@ pub struct Genes {
     pub metabolism: f64,
     pub intelligence: f64,
     pub stamina: f64,
+    pub personal_space: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -203,10 +204,24 @@ pub struct EcsWorld {
     pub max_resources: usize,
     pub resource_spawn_timer: f64,
     pub spatial_grid: SpatialGrid,
+    // Debug tracking
+    pub consumption_events_this_frame: usize,
+    pub total_consumption_events: usize,
 }
 
 impl EcsWorld {
     pub fn new(canvas_width: f64, canvas_height: f64) -> Self {
+        Self::new_with_population(canvas_width, canvas_height, 10000, 1500, 100, 500)
+    }
+
+    pub fn new_with_population(
+        canvas_width: f64,
+        canvas_height: f64,
+        max_agents: usize,
+        max_resources: usize,
+        initial_agents: usize,
+        initial_resources: usize,
+    ) -> Self {
         let world = World::new();
         let spatial_grid = SpatialGrid::new(canvas_width, canvas_height, 50.0);
 
@@ -214,23 +229,32 @@ impl EcsWorld {
             world,
             canvas_width,
             canvas_height,
-            max_agents: 10000,
-            max_resources: 1500,
+            max_agents,
+            max_resources,
             resource_spawn_timer: 0.0,
             spatial_grid,
+            // Debug tracking
+            consumption_events_this_frame: 0,
+            total_consumption_events: 0,
         };
 
         // Spawn initial population
-        ecs_world.spawn_initial_population();
+        ecs_world.spawn_initial_population(
+            initial_agents.min(max_agents),
+            initial_resources.min(max_resources),
+        );
 
         ecs_world
     }
 
     pub fn update(&mut self) {
-        let delta_time = 1.0 / 60.0;
+        let delta_time = 10.0 / 60.0; // 10x faster simulation
 
         // Update resources
         self.update_resources(delta_time);
+
+        // Handle consumption (agents eating resources and predators eating prey)
+        self.handle_consumption();
 
         // Update spatial grid
         self.update_spatial_grid();
@@ -244,11 +268,131 @@ impl EcsWorld {
         // Handle reproduction
         self.handle_reproduction();
 
-        // Spawn new resources
-        self.resource_spawn_timer += delta_time;
-        if self.resource_spawn_timer > 0.5 && self.get_resource_count() < self.max_resources {
-            self.spawn_resource();
-            self.resource_spawn_timer = 0.0;
+        // Disable automatic resource spawning - let resources be finite
+        // self.resource_spawn_timer += delta_time;
+        // if self.resource_spawn_timer > 0.05 && self.get_resource_count() < self.max_resources {
+        //     self.spawn_resource();
+        //     self.resource_spawn_timer = 0.0;
+        // }
+
+        // Handle resource depletion
+        self.handle_resource_depletion();
+    }
+
+    pub fn handle_resource_depletion(&mut self) {
+        // Find resources that are being consumed and deplete them
+        let mut to_deplete = Vec::new();
+
+        for (entity, resource) in self.world.query::<&Resource>().iter() {
+            if self.world.get::<&ResourceTag>(entity).is_ok() && resource.energy <= 0.0 {
+                to_deplete.push(entity);
+            }
+        }
+
+        // Remove depleted resources
+        for entity in to_deplete {
+            self.world.despawn(entity).ok();
+        }
+    }
+
+    pub fn handle_consumption(&mut self) {
+        // Reset frame counter
+        self.consumption_events_this_frame = 0;
+
+        // Track which resources are being consumed by agents
+        let mut consumed_resources = Vec::new();
+
+        // Check for agents consuming resources
+        for (agent_entity, (agent_pos, agent_genes)) in
+            self.world.query::<(&Position, &Genes)>().iter()
+        {
+            if self.world.get::<&AgentTag>(agent_entity).is_ok() {
+                // Look for nearby resources this agent might consume
+                for (resource_entity, (resource_pos, resource)) in
+                    self.world.query::<(&Position, &Resource)>().iter()
+                {
+                    if self.world.get::<&ResourceTag>(resource_entity).is_ok()
+                        && resource.is_available()
+                    {
+                        let distance = ((agent_pos.x - resource_pos.x).powi(2)
+                            + (agent_pos.y - resource_pos.y).powi(2))
+                        .sqrt();
+
+                        // Agent can consume resource if close enough
+                        if distance <= agent_genes.size * 2.0 {
+                            consumed_resources.push((
+                                agent_entity,
+                                resource_entity,
+                                agent_genes.energy_efficiency,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Actually consume the resources and give energy to agents
+        for (agent_entity, resource_entity, energy_efficiency) in consumed_resources {
+            if let Ok(mut resource) = self.world.get::<&mut Resource>(resource_entity) {
+                let consumption_amount = (resource.energy * 0.8).min(100.0); // Consume 80% of resource energy, max 100
+                let actual_consumed = resource.consume(consumption_amount);
+
+                // Track consumption events
+                self.consumption_events_this_frame += 1;
+                self.total_consumption_events += 1;
+
+                // Give energy to the agent that consumed the resource
+                if let Ok(mut agent_energy) = self.world.get::<&mut Energy>(agent_entity) {
+                    let energy_gain = actual_consumed * energy_efficiency;
+                    agent_energy.current =
+                        (agent_energy.current + energy_gain).min(agent_energy.max);
+                }
+
+                // If resource is now depleted, mark it for removal
+                if resource.energy <= 0.0 {
+                    resource.is_depleting = true;
+                }
+            }
+        }
+
+        // Simple predator-prey consumption - predators consume nearby prey
+        let mut to_kill = Vec::new();
+
+        for (predator_entity, (predator_pos, predator_genes, predator_energy)) in
+            self.world.query::<(&Position, &Genes, &Energy)>().iter()
+        {
+            if self.world.get::<&AgentTag>(predator_entity).is_ok()
+                && predator_genes.is_predator > 0.5
+                && predator_energy.current > 50.0
+            {
+                for (prey_entity, (prey_pos, prey_genes, prey_energy)) in
+                    self.world.query::<(&Position, &Genes, &Energy)>().iter()
+                {
+                    if prey_entity != predator_entity
+                        && self.world.get::<&AgentTag>(prey_entity).is_ok()
+                        && prey_genes.is_predator < 0.5
+                        && prey_energy.current > 0.0
+                    {
+                        let distance = ((predator_pos.x - prey_pos.x).powi(2)
+                            + (predator_pos.y - prey_pos.y).powi(2))
+                        .sqrt();
+                        let hunting_radius = predator_genes.hunting_speed * 3.0;
+
+                        if distance <= hunting_radius {
+                            to_kill.push(prey_entity);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Mark prey for death
+        for prey_entity in to_kill {
+            if let Ok(mut death_anim) = self.world.get::<&mut DeathAnimation>(prey_entity) {
+                death_anim.is_dying = true;
+                death_anim.reason = DeathReason::KilledByPredator;
+            }
         }
     }
 
@@ -258,6 +402,13 @@ impl EcsWorld {
         // Add agents to spatial grid
         for (entity, pos) in self.world.query::<&Position>().iter() {
             if self.world.get::<&AgentTag>(entity).is_ok() {
+                self.spatial_grid.add_entity(entity, pos.x, pos.y);
+            }
+        }
+
+        // Add resources to spatial grid
+        for (entity, pos) in self.world.query::<&Position>().iter() {
+            if self.world.get::<&ResourceTag>(entity).is_ok() {
                 self.spatial_grid.add_entity(entity, pos.x, pos.y);
             }
         }
@@ -302,11 +453,51 @@ impl EcsWorld {
         &mut self,
         entity: hecs::Entity,
         delta_time: f64,
-        resources: &[(f64, f64, Resource)],
+        _resources: &[(f64, f64, Resource)],
         canvas_width: f64,
         canvas_height: f64,
     ) {
-        // Get mutable references to agent components
+        // Legacy method - kept for compatibility
+        self.update_single_agent_optimized(entity, delta_time, canvas_width, canvas_height);
+    }
+
+    pub fn update_single_agent_optimized(
+        &mut self,
+        entity: hecs::Entity,
+        delta_time: f64,
+        canvas_width: f64,
+        canvas_height: f64,
+    ) {
+        // Get the agent's genes and position first to know the sense range
+        let (sense_range, pos_x, pos_y) = {
+            let genes = self.world.get::<&Genes>(entity).unwrap();
+            let pos = self.world.get::<&Position>(entity).unwrap();
+            (genes.sense_range, pos.x, pos.y)
+        };
+
+        // Collect nearby resource data first to avoid borrowing conflicts
+        let nearby_entities = self
+            .spatial_grid
+            .get_nearby_entities(pos_x, pos_y, sense_range);
+
+        let mut nearby_resources = Vec::new();
+        for entity in nearby_entities {
+            if self.world.get::<&ResourceTag>(entity).is_ok() {
+                if let Ok(resource_pos) = self.world.get::<&Position>(entity) {
+                    if let Ok(resource) = self.world.get::<&Resource>(entity) {
+                        if resource.is_available() {
+                            nearby_resources.push((
+                                resource_pos.x,
+                                resource_pos.y,
+                                resource.energy,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Now update the agent with the collected data
         let (pos, vel, energy, age, state, genes) = self
             .world
             .query_one_mut::<(
@@ -322,31 +513,29 @@ impl EcsWorld {
         // Update age
         age.value += delta_time;
 
-        // Energy consumption
-        let base_energy_cost = (genes.size * 0.05 + genes.speed * 0.02) * delta_time;
+        // Energy consumption - much higher to make starvation a real threat
+        let base_energy_cost = (genes.size * 0.2 + genes.speed * 0.1) * delta_time; // Increased from 0.05/0.02
         let metabolism_factor = genes.metabolism;
         let environmental_factor = 1.0 + (pos.x / canvas_width + pos.y / canvas_height) * 0.001;
         let total_energy_cost = base_energy_cost * metabolism_factor * environmental_factor;
         energy.current -= total_energy_cost / genes.energy_efficiency;
 
-        // Find nearby resources using spatial grid
-        let _nearby_entities =
-            self.spatial_grid
-                .get_nearby_entities(pos.x, pos.y, genes.sense_range);
+        // Find best resource and handle consumption
         let mut best_target = None;
         let mut best_score = f64::NEG_INFINITY;
+        let consumed_resource = false;
 
-        // Use the pre-collected resources for efficiency
-        for (rx, ry, resource) in resources {
-            if resource.is_available() {
-                let distance = ((pos.x - *rx).powi(2) + (pos.y - *ry).powi(2)).sqrt();
-                if distance <= genes.sense_range {
-                    let score = resource.energy / (distance + 1.0);
-                    if score > best_score {
-                        best_score = score;
-                        best_target = Some((*rx, *ry));
-                    }
+        for (rx, ry, resource_energy) in &nearby_resources {
+            let distance = ((pos.x - rx).powi(2) + (pos.y - ry).powi(2)).sqrt();
+            if distance <= genes.sense_range {
+                let score = resource_energy / (distance + 1.0);
+                if score > best_score {
+                    best_score = score;
+                    best_target = Some((*rx, *ry));
                 }
+
+                // Note: Resource consumption is handled in the main consumption loop
+                // This is just for targeting and movement
             }
         }
 
@@ -354,22 +543,66 @@ impl EcsWorld {
         if let Some((tx, ty)) = best_target {
             state.target_x = Some(tx);
             state.target_y = Some(ty);
-            state.state = AgentStateEnum::Hunting;
 
-            // Move towards target
-            let dx = tx - pos.x;
-            let dy = ty - pos.y;
-            let distance = (dx * dx + dy * dy).sqrt();
-            if distance > 0.0 {
-                vel.dx = (dx / distance) * genes.speed;
-                vel.dy = (dy / distance) * genes.speed;
+            if !consumed_resource {
+                state.state = AgentStateEnum::Hunting;
+
+                // Move towards target
+                let dx = tx - pos.x;
+                let dy = ty - pos.y;
+                let distance = (dx * dx + dy * dy).sqrt();
+                if distance > 0.0 {
+                    vel.dx = (dx / distance) * genes.speed;
+                    vel.dy = (dy / distance) * genes.speed;
+                }
             }
         } else {
-            // Random movement
+            // Random movement - make it more active
             let mut rng = thread_rng();
+
+            // Change direction more frequently for more movement
+            if rng.gen::<f64>() < 0.1 {
+                // 10% chance to change direction each frame
+                let angle = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
+                vel.dx = angle.cos() * genes.speed;
+                vel.dy = angle.sin() * genes.speed;
+            }
+
+            // Ensure minimum movement speed
+            let current_speed = (vel.dx * vel.dx + vel.dy * vel.dy).sqrt();
+            if current_speed < genes.speed * 0.5 {
+                let angle = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
+                vel.dx = angle.cos() * genes.speed;
+                vel.dy = angle.sin() * genes.speed;
+            }
+        }
+
+        // Calculate agent avoidance forces (simplified to avoid borrowing issues)
+        let mut avoidance_dx = 0.0;
+        let mut avoidance_dy = 0.0;
+
+        // Simple avoidance based on current position and genes
+        // We'll use a simplified approach that doesn't require additional world queries
+        let _avoidance_radius = genes.personal_space * 0.5; // Smaller radius for performance
+
+        // Apply a small random avoidance force to simulate personal space
+        let mut rng = thread_rng();
+        if rng.gen::<f64>() < 0.3 {
+            // 30% chance to apply avoidance
             let angle = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
-            vel.dx = angle.cos() * genes.speed;
-            vel.dy = angle.sin() * genes.speed;
+            avoidance_dx = angle.cos() * genes.speed * 0.3;
+            avoidance_dy = angle.sin() * genes.speed * 0.3;
+        }
+
+        // Apply avoidance forces to velocity
+        vel.dx += avoidance_dx;
+        vel.dy += avoidance_dy;
+
+        // Limit maximum speed
+        let current_speed = (vel.dx * vel.dx + vel.dy * vel.dy).sqrt();
+        if current_speed > genes.speed * 1.5 {
+            vel.dx = (vel.dx / current_speed) * genes.speed * 1.5;
+            vel.dy = (vel.dy / current_speed) * genes.speed * 1.5;
         }
 
         // Move agent
@@ -409,15 +642,27 @@ impl EcsWorld {
 
     pub fn handle_reproduction(&mut self) {
         // Find all agents that can reproduce
-        let mut potential_parents: Vec<_> = self.world
-            .query::<(&crate::ecs::Position, &crate::ecs::Energy, &crate::ecs::Age, &crate::ecs::AgentState, &crate::ecs::Genes)>()
+        let mut potential_parents: Vec<_> = self
+            .world
+            .query::<(
+                &crate::ecs::Position,
+                &crate::ecs::Energy,
+                &crate::ecs::Age,
+                &crate::ecs::AgentState,
+                &crate::ecs::Genes,
+            )>()
             .iter()
             .filter(|(entity, _)| self.world.get::<&crate::ecs::AgentTag>(*entity).is_ok())
-            .filter(|(_, (_, energy, age, state, _))| {
-                self.can_reproduce(energy, age, state)
-            })
+            .filter(|(_, (_, energy, age, state, _))| self.can_reproduce(energy, age, state))
             .map(|(entity, (pos, energy, age, state, genes))| {
-                (entity, pos.clone(), energy.clone(), age.clone(), state.clone(), genes.clone())
+                (
+                    entity,
+                    pos.clone(),
+                    energy.clone(),
+                    age.clone(),
+                    state.clone(),
+                    genes.clone(),
+                )
             })
             .collect();
 
@@ -438,39 +683,52 @@ impl EcsWorld {
 
             // Check if agents are close enough to reproduce
             let distance = self.distance(pos1, pos2);
-            if distance < 50.0 { // Reproduction radius
+            if distance < 100.0 {
+                // Increased reproduction radius
                 // Calculate reproduction probability based on energy and age
-                let energy_factor = (energy1.current / energy1.max).min(energy2.current / energy2.max);
-                let age_factor = (age1.value / 10.0).min(age2.value / 10.0).min(1.0);
-                let reproduction_chance = energy_factor * age_factor * 0.1; // 10% base chance
+                let energy_factor =
+                    (energy1.current / energy1.max).min(energy2.current / energy2.max);
+                let age_factor = (age1.value / 5.0).min(age2.value / 5.0).min(1.0); // Reduced age requirement
+                let reproduction_chance = energy_factor * age_factor * 0.3; // Increased to 30% base chance
 
                 if rng.gen::<f64>() < reproduction_chance {
                     // Create offspring with inherited genes
                     let offspring_genes = self.inherit_genes(genes1, genes2);
-                    
+
                     // Add some mutation
                     let mutated_genes = self.mutate_genes(&offspring_genes);
-                    
+
                     // Spawn offspring between parents
                     let offspring_x = (pos1.x + pos2.x) / 2.0;
                     let offspring_y = (pos1.y + pos2.y) / 2.0;
                     let offspring_generation = state1.generation.max(state2.generation) + 1;
-                    
-                    self.spawn_agent(offspring_x, offspring_y, mutated_genes, offspring_generation);
-                    
+
+                    self.spawn_agent(
+                        offspring_x,
+                        offspring_y,
+                        mutated_genes,
+                        offspring_generation,
+                    );
+
                     // Update parent reproduction timers
-                    if let Ok(mut state1_mut) = self.world.get::<&mut crate::ecs::AgentState>(*entity1) {
+                    if let Ok(mut state1_mut) =
+                        self.world.get::<&mut crate::ecs::AgentState>(*entity1)
+                    {
                         state1_mut.last_reproduction = age1.value;
                     }
-                    if let Ok(mut state2_mut) = self.world.get::<&mut crate::ecs::AgentState>(*entity2) {
+                    if let Ok(mut state2_mut) =
+                        self.world.get::<&mut crate::ecs::AgentState>(*entity2)
+                    {
                         state2_mut.last_reproduction = age2.value;
                     }
-                    
+
                     // Consume some energy from parents
-                    if let Ok(mut energy1_mut) = self.world.get::<&mut crate::ecs::Energy>(*entity1) {
+                    if let Ok(mut energy1_mut) = self.world.get::<&mut crate::ecs::Energy>(*entity1)
+                    {
                         energy1_mut.current = (energy1_mut.current - 20.0).max(10.0);
                     }
-                    if let Ok(mut energy2_mut) = self.world.get::<&mut crate::ecs::Energy>(*entity2) {
+                    if let Ok(mut energy2_mut) = self.world.get::<&mut crate::ecs::Energy>(*entity2)
+                    {
                         energy2_mut.current = (energy2_mut.current - 20.0).max(10.0);
                     }
                 }
@@ -480,7 +738,7 @@ impl EcsWorld {
     }
 
     fn can_reproduce(&self, energy: &Energy, age: &Age, state: &AgentState) -> bool {
-        energy.current > 10.0 && age.value > 2.0 && age.value - state.last_reproduction > 1.0
+        energy.current > 20.0 && age.value > 1.0 && age.value - state.last_reproduction > 0.5
     }
 
     fn distance(&self, pos1: &Position, pos2: &Position) -> f64 {
@@ -520,6 +778,8 @@ impl EcsWorld {
             intelligence: genes1.intelligence * blend_factor
                 + genes2.intelligence * (1.0 - blend_factor),
             stamina: genes1.stamina * blend_factor + genes2.stamina * (1.0 - blend_factor),
+            personal_space: genes1.personal_space * blend_factor
+                + genes2.personal_space * (1.0 - blend_factor),
         }
     }
 
@@ -535,7 +795,7 @@ impl EcsWorld {
                 dy: angle.sin() * genes.speed,
             },
             Energy {
-                current: 80.0,
+                current: 30.0, // Reduced from 80.0 to make starvation more likely
                 max: 100.0,
             },
             Age { value: 0.0 },
@@ -573,15 +833,15 @@ impl EcsWorld {
         self.world.spawn((
             Position { x, y },
             Resource {
-                energy: 0.0,
+                energy: initial_energy, // Start with initial energy so resources are immediately available
                 max_energy,
                 size: 3.0,
                 growth_rate: rng.gen_range(0.1..0.5),
                 regeneration_rate: rng.gen_range(0.02..0.1),
                 age: 0.0,
                 target_energy: initial_energy,
-                is_spawning: true,
-                spawn_fade: 0.0,
+                is_spawning: false, // Start fully spawned
+                spawn_fade: 1.0,    // Start fully spawned and immediately available
                 is_depleting: false,
                 deplete_fade: 0.0,
             },
@@ -590,11 +850,10 @@ impl EcsWorld {
         ));
     }
 
-    fn spawn_initial_population(&mut self) {
+    fn spawn_initial_population(&mut self, initial_agents: usize, initial_resources: usize) {
         let mut rng = thread_rng();
 
         // Spawn initial agents
-        let initial_agents = 100; // 10% of max
         for _ in 0..initial_agents {
             let x = rng.gen_range(0.0..self.canvas_width);
             let y = rng.gen_range(0.0..self.canvas_height);
@@ -603,7 +862,6 @@ impl EcsWorld {
         }
 
         // Spawn initial resources
-        let initial_resources = 150; // 10% of max
         for _ in 0..initial_resources {
             self.spawn_resource();
         }
@@ -631,32 +889,41 @@ impl EcsWorld {
             metabolism: rng.gen_range(0.8..1.4),
             intelligence: rng.gen_range(0.5..1.5),
             stamina: rng.gen_range(0.5..1.5),
+            personal_space: rng.gen_range(20.0..60.0),
         }
     }
 
     fn mutate_genes(&self, genes: &Genes) -> Genes {
         let mut rng = thread_rng();
         let mutation_strength = 0.1; // 10% mutation strength
-        
+
         Genes {
             speed: genes.speed * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             sense_range: genes.sense_range * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             size: genes.size * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
-            energy_efficiency: genes.energy_efficiency * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
-            reproduction_threshold: genes.reproduction_threshold * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
-            mutation_rate: genes.mutation_rate * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            energy_efficiency: genes.energy_efficiency
+                * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            reproduction_threshold: genes.reproduction_threshold
+                * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            mutation_rate: genes.mutation_rate
+                * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             aggression: genes.aggression * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             color_hue: genes.color_hue * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             is_predator: genes.is_predator * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
-            hunting_speed: genes.hunting_speed * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            hunting_speed: genes.hunting_speed
+                * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             attack_power: genes.attack_power * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             defense: genes.defense * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             stealth: genes.stealth * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
-            pack_mentality: genes.pack_mentality * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
-            territory_size: genes.territory_size * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            pack_mentality: genes.pack_mentality
+                * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            territory_size: genes.territory_size
+                * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             metabolism: genes.metabolism * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             intelligence: genes.intelligence * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
             stamina: genes.stamina * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
+            personal_space: genes.personal_space
+                * (1.0 + (rng.gen::<f64>() - 0.5) * mutation_strength),
         }
     }
 
@@ -699,10 +966,17 @@ impl EcsWorld {
     }
 
     pub fn reset(&mut self) {
+        self.reset_with_population(100, 500);
+    }
+
+    pub fn reset_with_population(&mut self, initial_agents: usize, initial_resources: usize) {
         self.world = World::new();
         self.resource_spawn_timer = 0.0;
         self.spatial_grid.clear();
-        self.spawn_initial_population();
+        self.spawn_initial_population(
+            initial_agents.min(self.max_agents),
+            initial_resources.min(self.max_resources),
+        );
     }
 
     pub fn get_agents(&self) -> Vec<(Position, Velocity, Energy, Age, AgentState, Genes, Size)> {
@@ -764,47 +1038,61 @@ impl Resource {
             }
         }
 
-        // Smooth energy growth towards target
-        if !self.is_spawning && !self.is_depleting {
-            let energy_diff = self.target_energy - self.energy;
-            if energy_diff.abs() > 0.1 {
-                let growth_direction = if energy_diff > 0.0 { 1.0 } else { -1.0 };
-                let growth_amount = self.growth_rate * delta_time * growth_direction;
+        // Disable resource growth and regeneration - resources should only deplete
+        // if !self.is_spawning && !self.is_depleting {
+        //     let energy_diff = self.target_energy - self.energy;
+        //     if energy_diff.abs() > 0.1 {
+        //         let growth_direction = if energy_diff > 0.0 { 1.0 } else { -1.0 };
+        //         let growth_amount = self.growth_rate * delta_time * growth_direction;
 
-                if energy_diff.abs() < growth_amount.abs() {
-                    self.energy = self.target_energy;
-                } else {
-                    self.energy += growth_amount;
-                }
-            }
+        //         if energy_diff.abs() < growth_amount.abs() {
+        //             self.energy = self.target_energy;
+        //         } else {
+        //             self.energy += growth_amount;
+        //         }
+        //     }
 
-            // Natural growth towards max energy
-            if self.energy < self.max_energy {
-                self.energy += self.growth_rate * delta_time * 0.05;
-                if self.energy > self.max_energy {
-                    self.energy = self.max_energy;
-                }
-            }
+        //     // Natural growth towards max energy
+        //     if self.energy < self.max_energy {
+        //         self.energy += self.growth_rate * delta_time * 0.05;
+        //         if self.energy > self.max_energy {
+        //             self.energy = self.max_energy;
+        //         }
+        //     }
 
-            if self.energy >= self.max_energy {
-                self.target_energy = self.max_energy;
-            }
-        }
+        //     if self.energy >= self.max_energy {
+        //         self.target_energy = self.max_energy;
+        //     }
+        // }
 
-        // Size changes based on energy
+        // Size changes based on energy (keep this for visual feedback)
         let target_size = 3.0 + (self.energy / self.max_energy) * 5.0;
         let size_diff = target_size - self.size;
         if size_diff.abs() > 0.1 {
             self.size += size_diff * delta_time * 2.0;
         }
 
-        // Regeneration when depleted
-        if self.energy < 10.0 && !self.is_depleting {
-            self.energy += self.regeneration_rate * delta_time * 0.2;
-        }
+        // Disable regeneration - resources should not recover
+        // if self.energy < 10.0 && !self.is_depleting {
+        //     self.energy += self.regeneration_rate * delta_time * 0.2;
+        // }
     }
 
     pub fn is_available(&self) -> bool {
         self.energy > 5.0 && !self.is_depleting && self.spawn_fade > 0.5
+    }
+
+    pub fn consume(&mut self, amount: f64) -> f64 {
+        let consumed = amount.min(self.energy);
+        self.energy -= consumed;
+
+        // If completely depleted, start depletion fade
+        if self.energy <= 0.0 {
+            self.is_depleting = true;
+            self.deplete_fade = 0.0;
+            self.energy = 0.0;
+        }
+
+        consumed
     }
 }

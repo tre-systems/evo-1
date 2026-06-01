@@ -37,7 +37,6 @@ WebAssembly doesn't have native threading, but wasm-bindgen-rayon creates JavaSc
 ```bash
 # Install nightly Rust (required for wasm-bindgen-rayon)
 rustup toolchain install nightly
-rustup default nightly
 
 # Install wasm-pack
 cargo install wasm-pack
@@ -686,8 +685,8 @@ console.log("Features:", features);
 
 ### Optimal Settings
 
-- **Web**: 1,000-10,000 agents for 60 FPS
-- **Headless**: 100,000+ agents with speed multipliers
+- **Web**: Tune population size to the browser and rendering mode
+- **Headless**: Use release builds and benchmark with the target scenario
 - **Spatial Grid**: 50px cell size for most simulations
 - **Worker Count**: 4-8 workers for WASM, all cores for native
 

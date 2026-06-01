@@ -4,8 +4,5 @@ rustflags = ["-C", "target-feature=+atomics,+bulk-memory"]
 [unstable]
 build-std = ["std", "panic_abort"]
 
-[build]
-target = "wasm32-unknown-unknown"
-
 [env]
 RUST_BACKTRACE = "1"

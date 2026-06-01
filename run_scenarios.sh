@@ -49,9 +49,9 @@ run_scenario() {
     echo ""
     
     # Build if needed
-    if [ ! -f "./target/x86_64-apple-darwin/release/headless" ]; then
+    if [ ! -f "./target/release/headless" ]; then
         echo "Building simulation..."
-        cargo build --bin headless --target x86_64-apple-darwin --release
+        cargo build --bin headless --release
         if [ $? -ne 0 ]; then
             echo "❌ Build failed!"
             return 1
@@ -60,7 +60,7 @@ run_scenario() {
     
     # Run simulation
     echo "Starting simulation..."
-    ./target/x86_64-apple-darwin/release/headless "$duration" "$speed" "$init_agents" "$init_resources" "$max_agents" "$max_resources"
+    ./target/release/headless "$duration" "$speed" "$init_agents" "$init_resources" "$max_agents" "$max_resources"
     
     echo ""
     echo "✅ Scenario '$scenario_name' completed!"
@@ -104,4 +104,4 @@ if [ "$FOUND" = false ]; then
         echo "  - $name"
     done
     exit 1
-fi 
+fi

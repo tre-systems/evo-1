@@ -12,18 +12,24 @@ pub struct Genes {
     pub mutation_rate: f64,          // How likely genes are to mutate
     pub aggression: f64,             // How likely to attack other agents
     pub color_hue: f64,              // Visual trait for identification
-    
+
     // NEW PREDATOR GENES
-    pub is_predator: f64,            // Probability of being a predator (0.0-1.0)
-    pub hunting_speed: f64,          // Speed multiplier when hunting
-    pub attack_power: f64,           // Damage dealt when attacking
-    pub defense: f64,                // Resistance to attacks
-    pub stealth: f64,                // Ability to sneak up on prey
-    pub pack_mentality: f64,         // Tendency to hunt in groups
-    pub territory_size: f64,         // Size of hunting territory
-    pub metabolism: f64,             // How fast energy is consumed
-    pub intelligence: f64,           // Learning and adaptation ability
-    pub stamina: f64,                // How long can chase prey
+    pub is_predator: f64,    // Probability of being a predator (0.0-1.0)
+    pub hunting_speed: f64,  // Speed multiplier when hunting
+    pub attack_power: f64,   // Damage dealt when attacking
+    pub defense: f64,        // Resistance to attacks
+    pub stealth: f64,        // Ability to sneak up on prey
+    pub pack_mentality: f64, // Tendency to hunt in groups
+    pub territory_size: f64, // Size of hunting territory
+    pub metabolism: f64,     // How fast energy is consumed
+    pub intelligence: f64,   // Learning and adaptation ability
+    pub stamina: f64,        // How long can chase prey
+}
+
+impl Default for Genes {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Genes {
@@ -31,26 +37,26 @@ impl Genes {
         let mut rng = thread_rng();
 
         Self {
-            speed: rng.gen_range(0.8..1.5), // Reduced from 0.5..2.0
-            sense_range: rng.gen_range(30.0..80.0), // Reduced from 20.0..100.0
-            size: rng.gen_range(0.9..1.3), // Reduced from 0.8..1.5
+            speed: rng.gen_range(0.8..1.5),             // Reduced from 0.5..2.0
+            sense_range: rng.gen_range(30.0..80.0),     // Reduced from 20.0..100.0
+            size: rng.gen_range(0.9..1.3),              // Reduced from 0.8..1.5
             energy_efficiency: rng.gen_range(0.8..1.2), // Reduced from 0.7..1.3
             reproduction_threshold: rng.gen_range(60.0..120.0), // Reduced from 50.0..150.0
-            mutation_rate: rng.gen_range(0.02..0.08), // Reduced from 0.01..0.1
-            aggression: rng.gen_range(0.2..0.8), // Reduced from 0.0..1.0
+            mutation_rate: rng.gen_range(0.02..0.08),   // Reduced from 0.01..0.1
+            aggression: rng.gen_range(0.2..0.8),        // Reduced from 0.0..1.0
             color_hue: rng.gen_range(0.0..360.0),
-            
+
             // NEW PREDATOR GENES
             is_predator: rng.gen_range(0.0..0.3), // 30% chance of being predator
             hunting_speed: rng.gen_range(1.0..2.0), // Hunters are faster
             attack_power: rng.gen_range(0.5..1.5), // Attack strength
-            defense: rng.gen_range(0.5..1.5), // Defense against attacks
-            stealth: rng.gen_range(0.0..1.0), // Stealth ability
+            defense: rng.gen_range(0.5..1.5),     // Defense against attacks
+            stealth: rng.gen_range(0.0..1.0),     // Stealth ability
             pack_mentality: rng.gen_range(0.0..1.0), // Group hunting tendency
             territory_size: rng.gen_range(50.0..150.0), // Hunting territory
-            metabolism: rng.gen_range(0.8..1.4), // Energy consumption rate
+            metabolism: rng.gen_range(0.8..1.4),  // Energy consumption rate
             intelligence: rng.gen_range(0.5..1.5), // Learning ability
-            stamina: rng.gen_range(0.5..1.5), // Chase endurance
+            stamina: rng.gen_range(0.5..1.5),     // Chase endurance
         }
     }
 
@@ -91,17 +97,52 @@ impl Genes {
                 &mut rng,
             ),
             color_hue: self.mutate_gene(self.color_hue, other.color_hue, mutation_rate, &mut rng),
-            
+
             // NEW PREDATOR GENES
-            is_predator: self.mutate_gene(self.is_predator, other.is_predator, mutation_rate, &mut rng),
-            hunting_speed: self.mutate_gene(self.hunting_speed, other.hunting_speed, mutation_rate, &mut rng),
-            attack_power: self.mutate_gene(self.attack_power, other.attack_power, mutation_rate, &mut rng),
+            is_predator: self.mutate_gene(
+                self.is_predator,
+                other.is_predator,
+                mutation_rate,
+                &mut rng,
+            ),
+            hunting_speed: self.mutate_gene(
+                self.hunting_speed,
+                other.hunting_speed,
+                mutation_rate,
+                &mut rng,
+            ),
+            attack_power: self.mutate_gene(
+                self.attack_power,
+                other.attack_power,
+                mutation_rate,
+                &mut rng,
+            ),
             defense: self.mutate_gene(self.defense, other.defense, mutation_rate, &mut rng),
             stealth: self.mutate_gene(self.stealth, other.stealth, mutation_rate, &mut rng),
-            pack_mentality: self.mutate_gene(self.pack_mentality, other.pack_mentality, mutation_rate, &mut rng),
-            territory_size: self.mutate_gene(self.territory_size, other.territory_size, mutation_rate, &mut rng),
-            metabolism: self.mutate_gene(self.metabolism, other.metabolism, mutation_rate, &mut rng),
-            intelligence: self.mutate_gene(self.intelligence, other.intelligence, mutation_rate, &mut rng),
+            pack_mentality: self.mutate_gene(
+                self.pack_mentality,
+                other.pack_mentality,
+                mutation_rate,
+                &mut rng,
+            ),
+            territory_size: self.mutate_gene(
+                self.territory_size,
+                other.territory_size,
+                mutation_rate,
+                &mut rng,
+            ),
+            metabolism: self.mutate_gene(
+                self.metabolism,
+                other.metabolism,
+                mutation_rate,
+                &mut rng,
+            ),
+            intelligence: self.mutate_gene(
+                self.intelligence,
+                other.intelligence,
+                mutation_rate,
+                &mut rng,
+            ),
             stamina: self.mutate_gene(self.stamina, other.stamina, mutation_rate, &mut rng),
         }
     }
@@ -136,7 +177,7 @@ impl Genes {
             aggression if aggression > 1.0 => 1.0,
             color_hue if color_hue < 0.0 => 0.0,
             color_hue if color_hue > 360.0 => 360.0,
-            
+
             // NEW PREDATOR GENE CLAMPING
             is_predator if is_predator < 0.0 => 0.0,
             is_predator if is_predator > 1.0 => 1.0,
@@ -169,7 +210,7 @@ impl Genes {
         let efficiency_score = self.energy_efficiency * 0.2;
         let size_score = (1.0 / self.size) * 0.1; // Smaller is better for energy efficiency
         let reproduction_score = (1.0 / self.reproduction_threshold) * 50.0 * 0.1;
-        
+
         // NEW PREDATOR FITNESS SCORES
         let predator_bonus = if self.is_predator > 0.5 { 0.5 } else { 0.0 }; // Predators get bonus
         let hunting_score = self.hunting_speed * 0.1;
@@ -178,7 +219,16 @@ impl Genes {
         let intelligence_score = self.intelligence * 0.1;
         let stamina_score = self.stamina * 0.1;
 
-        speed_score + sense_score + efficiency_score + size_score + reproduction_score + 
-        predator_bonus + hunting_score + attack_score + defense_score + intelligence_score + stamina_score
+        speed_score
+            + sense_score
+            + efficiency_score
+            + size_score
+            + reproduction_score
+            + predator_bonus
+            + hunting_score
+            + attack_score
+            + defense_score
+            + intelligence_score
+            + stamina_score
     }
 }

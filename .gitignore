@@ -1,6 +1,5 @@
 # Rust build artifacts
 target/
-Cargo.lock
 
 # WebAssembly build output
 pkg/
@@ -20,4 +19,4 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
