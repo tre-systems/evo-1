@@ -137,7 +137,7 @@ digraph BattleORuntimeModel {
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">ResourceTag</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">role marker</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Position</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">world location</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Resource</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">energy, growth, depletion</FONT></TD></TR>
-        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Size</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">render and collision scale</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Size</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">snapshot/render size</FONT></TD></TR>
       </TABLE>
     >];
   }
@@ -177,12 +177,11 @@ digraph BattleORuntimeModel {
       </TABLE>
     >];
 
-    legacy_dtos [label=<
+    snapshot_dtos [label=<
       <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#7c3aed">
-        <TR><TD COLSPAN="2" BGCOLOR="#7c3aed"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>Legacy DTOs</B></FONT></TD></TR>
+        <TR><TD COLSPAN="2" BGCOLOR="#7c3aed"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>Snapshot DTOs</B></FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">agent::Agent</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">render/API snapshot</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">resource::Resource</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">render/API snapshot</FONT></TD></TR>
-        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">genes::Genes</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">compatibility copy</FONT></TD></TR>
       </TABLE>
     >];
   }
@@ -194,6 +193,6 @@ digraph BattleORuntimeModel {
   ecs_world -> agent_entity [ltail=cluster_simulation, lhead=cluster_entities, label="spawns and mutates"];
   ecs_world -> resource_entity [ltail=cluster_simulation, lhead=cluster_entities, label="spawns and mutates"];
   simulation -> stats [ltail=cluster_simulation, lhead=cluster_outputs, label="aggregates"];
-  simulation -> legacy_dtos [ltail=cluster_simulation, lhead=cluster_outputs, label="converts snapshots"];
+  simulation -> snapshot_dtos [ltail=cluster_simulation, lhead=cluster_outputs, label="converts snapshots"];
   stats -> diagnostics [ltail=cluster_outputs, label="included in headless run"];
 }

@@ -44,7 +44,7 @@ After building `pkg/`, run:
 python3 server.py
 ```
 
-Then open `http://localhost:8000` and verify:
+Then open `http://127.0.0.1:8000` and verify:
 
 - The page reports that the simulation is ready.
 - `Start Simulation` advances the stats.

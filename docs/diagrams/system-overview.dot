@@ -126,7 +126,7 @@ digraph BattleOSystemOverview {
     renderer [label=<<B>WebRenderer</B><BR/><FONT POINT-SIZE="15">WebGL first, Canvas2D fallback</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
     stats [label=<<B>SimulationStats</B><BR/><FONT POINT-SIZE="15">browser and API snapshot</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
     diagnostics [label=<<B>SimulationDiagnostics</B><BR/><FONT POINT-SIZE="15">headless experiment summary</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
-    dto [label=<<B>Legacy DTOs</B><BR/><FONT POINT-SIZE="15">Agent, Resource, Genes conversion</FONT>>, fillcolor="#f5f3ff:#ffffff", color="#7c3aed"];
+    dto [label=<<B>Snapshot DTOs</B><BR/><FONT POINT-SIZE="15">Agent and Resource read models</FONT>>, fillcolor="#f5f3ff:#ffffff", color="#7c3aed"];
   }
 
   browser -> wasm_adapter [label="update, reset, add, stats"];

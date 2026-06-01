@@ -1,6 +1,6 @@
 # API Reference
 
-This file documents the public API surfaces that are meant to be used directly. The ECS internals are documented in [implementation.md](implementation.md) and the diagrams.
+This file documents the public API surfaces that are meant to be used directly. Architecture patterns and ECS internals are documented in [implementation.md](implementation.md).
 
 ## Rust Simulation API
 

@@ -14,7 +14,7 @@ Graphviz/DOT sources plus rendered PNGs. The `.dot` files are the source of trut
 
 1. **System overview** for the browser, native, simulation, ECS, rendering, and diagnostics boundaries.
 2. **Frame pipeline** before changing per-frame behavior, parallel work, spatial queries, reproduction, death, or resource lifecycle code.
-3. **Runtime model** before changing configuration, ECS components, legacy DTO conversion, stats, or headless diagnostics.
+3. **Runtime model** before changing configuration, ECS components, snapshot DTO conversion, stats, or headless diagnostics.
 
 ## Conventions
 
@@ -22,7 +22,7 @@ Color coding by domain:
 
 - Green nodes and clusters: simulation core, ECS world, and write-side systems.
 - Yellow/orange nodes: time-driven or parallel-compute stages.
-- Purple nodes: compatibility DTOs and adapter-facing translation boundaries.
+- Purple nodes: compatibility DTOs, snapshot DTOs, and adapter-facing translation boundaries.
 - Teal nodes: runtime data structures and generated outputs.
 - Blue nodes: browser, CLI, rendering, and read-only surfaces.
 - Red nodes: lifecycle terminal/removal states.
