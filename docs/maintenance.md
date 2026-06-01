@@ -12,20 +12,22 @@ There is no configured live site for this repository at the moment. GitHub repor
 Run these before pushing code changes:
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo check --target wasm32-unknown-unknown
-node scripts/check-diagrams.mjs
+./scripts/check.sh
 ```
+
+`scripts/check.sh` runs formatting, clippy, tests, the stable WASM check, the pinned nightly threaded-WASM check, and the Graphviz diagram check.
 
 For the threaded browser package build:
 
 ```bash
-RUSTUP_TOOLCHAIN=nightly wasm-pack build --target web --out-dir pkg . --features wasm-bindgen-rayon -Z unstable-options
+./scripts/build-wasm.sh
 ```
 
-The `-Z unstable-options` passthrough is required by current Cargo/wasm-pack combinations because wasm-pack forwards its output directory to Cargo.
+The threaded WASM path requires `nightly-2024-08-02` with `rust-src` and `wasm32-unknown-unknown` installed:
+
+```bash
+rustup toolchain install nightly-2024-08-02 --component rust-src --target wasm32-unknown-unknown
+```
 
 For a quick native behavior smoke test:
 

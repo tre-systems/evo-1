@@ -9,6 +9,7 @@
     />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <link rel="icon" href="data:," />
     <title>BattleO - Evolutionary Simulation</title>
     <style>
       body {
@@ -186,6 +187,7 @@
       let processor = null;
       let animationId = null;
       let isRunning = false;
+      let parallelInitialized = false;
       let frameCount = 0;
       let lastTime = performance.now();
 
@@ -211,22 +213,6 @@
           stats.average_age
         );
         document.getElementById("maxGen").textContent = stats.max_generation;
-
-        // Debug stats for resource consumption
-        console.log("=== DEBUG STATS ===");
-        console.log("Total resource energy:", stats.total_resource_energy);
-        console.log("Average resource energy:", stats.average_resource_energy);
-        console.log(
-          "Consumption events this frame:",
-          stats.consumption_events_this_frame
-        );
-        console.log(
-          "Total consumption events:",
-          stats.total_consumption_events
-        );
-        console.log("Average agent energy:", stats.average_agent_energy);
-        console.log("Agents with targets:", stats.agents_with_targets);
-        console.log("===================");
       }
 
       function updateFPS() {
@@ -283,24 +269,31 @@
       }
 
       async function initializeParallelProcessing() {
-        if (!processor) return;
+        if (!processor || parallelInitialized) return;
 
         try {
+          initParallelBtn.disabled = true;
           updateStatus("Initializing parallel processing...", "info");
           await processor.initialize();
 
           if (processor.is_rayon_available()) {
+            parallelInitialized = true;
+            simulation?.set_parallel_resources_enabled(true);
             updateStatus(
               "Parallel processing enabled! Using Web Workers for true threading.",
               "success"
             );
           } else {
+            simulation?.set_parallel_resources_enabled(false);
+            initParallelBtn.disabled = false;
             updateStatus(
               "Parallel processing not available. Using sequential processing.",
               "error"
             );
           }
         } catch (error) {
+          simulation?.set_parallel_resources_enabled(false);
+          initParallelBtn.disabled = false;
           updateStatus(
             `Failed to initialize parallel processing: ${error}`,
             "error"

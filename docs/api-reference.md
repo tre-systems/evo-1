@@ -10,6 +10,7 @@ Complete API documentation for the BattleO framework.
 pub struct Simulation {
     ecs_world: EcsWorld,
     config: SimulationConfig,
+    runtime_capabilities: RuntimeCapabilities,
     time: f64,
     resource_spawn_timer: f64,
 }
@@ -18,13 +19,23 @@ pub struct Simulation {
 **Methods:**
 - `new() -> Self` - Create new simulation with default config
 - `new_with_config(config: SimulationConfig) -> Self` - Create simulation with custom population and limit config
+- `new_with_config_and_capabilities(config: SimulationConfig, runtime_capabilities: RuntimeCapabilities) -> Self` - Create simulation with explicit platform capabilities
 - `update()` - Update simulation for one frame
 - `add_agent(x: f64, y: f64)` - Add agent at position
 - `add_resource(x: f64, y: f64)` - Add resource at position
 - `reset()` - Reset simulation to initial state
+- `set_runtime_capabilities(runtime_capabilities: RuntimeCapabilities)` - Update explicit runtime capabilities
 - `get_stats() -> SimulationStats` - Get current simulation statistics
 - `get_agents() -> Vec<Agent>` - Get all agents (legacy format)
 - `get_resources() -> Vec<Resource>` - Get all resources (legacy format)
+
+### RuntimeCapabilities
+
+```rust
+pub struct RuntimeCapabilities {
+    pub parallel_resources: bool,      // Use Rayon resource update path
+}
+```
 
 ### SimulationConfig
 
@@ -56,10 +67,30 @@ pub struct SimulationStats {
     pub average_sense_range: f64,      // Average agent sense range
     pub average_energy_efficiency: f64, // Average energy efficiency
     pub max_generation: u32,           // Highest generation reached
-    pub total_kills: u32,              // Total kills across all agents
+    pub total_kills: u32,              // Total kill events
     pub average_fitness: f64,          // Average fitness (energy/max_energy)
+    pub consumption_events_this_frame: usize,
+    pub total_consumption_events: usize,
+    pub birth_events_this_frame: usize,
+    pub death_events_this_frame: usize,
+    pub kill_events_this_frame: usize,
+    pub total_birth_events: usize,
+    pub total_death_events: usize,
 }
 ```
+
+### FrameEvent
+
+```rust
+pub enum FrameEvent {
+    ResourceConsumed { agent, resource, amount },
+    AgentBorn { agent, generation },
+    AgentDied { agent, reason },
+    AgentKilled { predator, prey },
+}
+```
+
+`EcsWorld` resets the frame ledger at the start of each update. `SimulationStats` exposes frame and lifetime counters derived from these events.
 
 ## WASM API
 
@@ -76,6 +107,8 @@ class BattleSimulation {
     add_resource(x: number, y: number) -> void
     reset() -> void
     get_rendering_mode() -> string
+    set_parallel_resources_enabled(enabled: boolean) -> void
+    is_parallel_resources_enabled() -> boolean
 }
 ```
 
@@ -114,15 +147,17 @@ class ParallelProcessor {
 
 **Usage:**
 ```javascript
-import init, { ParallelProcessor } from "./pkg/battleo.js";
+import init, { BattleSimulation, ParallelProcessor } from "./pkg/battleo.js";
 
 async function main() {
     await init();
     
+    const simulation = new BattleSimulation("canvas");
     const processor = new ParallelProcessor();
     await processor.initialize();
     
     if (processor.is_rayon_available()) {
+        simulation.set_parallel_resources_enabled(true);
         console.log("Parallel processing enabled!");
     }
 }
@@ -355,19 +390,6 @@ pub struct WebRenderer {
 - `get_rendering_mode() -> String` - Get current rendering mode
 
 ## Utility Functions
-
-### Parallel Processing
-
-```rust
-// Check if parallel processing is available
-pub fn is_rayon_available() -> bool
-
-// Set parallel processing availability
-pub fn set_rayon_available(available: bool)
-
-// Get optimal worker count
-fn get_optimal_worker_count() -> usize
-```
 
 ### Color Conversion
 

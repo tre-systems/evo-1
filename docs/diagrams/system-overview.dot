@@ -66,7 +66,7 @@ digraph BattleOSystemOverview {
     ];
 
     wasm_adapter [label=<<B>BattleSimulation</B><BR/><FONT POINT-SIZE="15">WASM API in src/lib.rs</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
-    parallel_adapter [label=<<B>ParallelProcessor</B><BR/><FONT POINT-SIZE="15">rayon availability flag</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    parallel_adapter [label=<<B>ParallelProcessor</B><BR/><FONT POINT-SIZE="15">thread-pool readiness</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
     headless_adapter [label=<<B>HeadlessSimulation</B><BR/><FONT POINT-SIZE="15">native experiment runner</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
 
     wasm_adapter -> parallel_adapter [label="optional worker pool", style=dashed, color="#6b7280", fontcolor="#6b7280"];
@@ -90,14 +90,18 @@ digraph BattleOSystemOverview {
     ];
 
     simulation [label=<<B>Simulation facade</B><BR/><FONT POINT-SIZE="15">config, time, commands, stats</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    capabilities [label=<<B>RuntimeCapabilities</B><BR/><FONT POINT-SIZE="15">explicit parallel resource flag</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
     world [label=<<B>EcsWorld</B><BR/><FONT POINT-SIZE="15">hecs::World + systems</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
     components [label=<<B>ECS components</B><BR/><FONT POINT-SIZE="15">Position, Energy, Genes, tags</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
     spatial_grid [label=<<B>SpatialGrid</B><BR/><FONT POINT-SIZE="15">nearby entity lookup</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    events [label=<<B>FrameEvent ledger</B><BR/><FONT POINT-SIZE="15">consumed, killed, died, born</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
     frame_pipeline [label=<<B>Ordered frame pipeline</B><BR/><FONT POINT-SIZE="15">resources, consumption, agents, lifecycle</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
 
     simulation -> world [label="owns"];
+    simulation -> capabilities [label="owns"];
     world -> components [label="stores"];
     world -> spatial_grid [label="rebuilds each frame"];
+    world -> events [label="records lifecycle facts"];
     simulation -> frame_pipeline [label="runs update()"];
     frame_pipeline -> world [label="mutates ECS"];
   }
@@ -131,7 +135,7 @@ digraph BattleOSystemOverview {
 
   wasm_adapter -> simulation [lhead=cluster_core, label="delegates"];
   headless_adapter -> simulation [lhead=cluster_core, label="delegates"];
-  parallel_adapter -> simulation [lhead=cluster_core, label="sets rayon flag"];
+  parallel_adapter -> capabilities [lhead=cluster_core, label="enables after init"];
 
   simulation -> renderer [ltail=cluster_core, lhead=cluster_outputs, label="render snapshot"];
   simulation -> stats [ltail=cluster_core, lhead=cluster_outputs, label="get_stats"];

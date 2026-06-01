@@ -25,14 +25,14 @@ A high-performance evolutionary simulation framework built in Rust with WebAssem
 
 ```bash
 # Build with parallel processing support
-RUSTUP_TOOLCHAIN=nightly wasm-pack build --target web --out-dir pkg . --features wasm-bindgen-rayon -Z unstable-options
+./scripts/build-wasm.sh
 
 # Serve with SharedArrayBuffer headers and open in browser
 python3 server.py
 # Open http://localhost:8000
 ```
 
-The `-Z unstable-options` passthrough is required by current Cargo/wasm-pack combinations when wasm-pack forwards its output directory to `cargo build`.
+The threaded WASM build uses pinned `nightly-2024-08-02` with `rust-src`, atomics, bulk memory, and the `wasm-bindgen-rayon/no-bundler` setup required by this no-bundler browser app.
 
 #### Headless Mode (Native)
 
@@ -116,7 +116,7 @@ Both scripts automatically:
 ### Core Components
 
 - **Simulation Engine**: ECS-based with spatial partitioning
-- **Parallel Processing**: Rayon (native) / wasm-bindgen-rayon (WASM)
+- **Parallel Processing**: Explicit runtime capability for Rayon-backed resource updates
 - **Rendering**: WebGL with Canvas2D fallback
 - **Agents**: Evolvable creatures with genes and behaviors
 - **Resources**: Consumable energy sources
@@ -149,10 +149,10 @@ cargo build
 cargo build --release
 
 # WASM build with parallel processing
-RUSTUP_TOOLCHAIN=nightly wasm-pack build --target web --out-dir pkg . --features wasm-bindgen-rayon -Z unstable-options
+./scripts/build-wasm.sh
 
-# Run tests
-cargo test
+# Full local check suite
+./scripts/check.sh
 ```
 
 ### Configuration

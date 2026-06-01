@@ -1,4 +1,6 @@
 #[cfg(target_arch = "wasm32")]
+use std::{cell::Cell, rc::Rc};
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 // Core simulation modules (shared between headless and web)
@@ -80,6 +82,17 @@ impl BattleSimulation {
             "No rendering (headless)".to_string()
         }
     }
+
+    pub fn set_parallel_resources_enabled(&mut self, enabled: bool) {
+        self.simulation
+            .set_runtime_capabilities(simulation::RuntimeCapabilities {
+                parallel_resources: enabled,
+            });
+    }
+
+    pub fn is_parallel_resources_enabled(&self) -> bool {
+        self.simulation.runtime_capabilities().parallel_resources
+    }
 }
 
 // ============================================================================
@@ -91,6 +104,7 @@ impl BattleSimulation {
 pub struct ParallelProcessor {
     initialized: bool,
     worker_count: usize,
+    available: Rc<Cell<bool>>,
     #[wasm_bindgen(skip)]
     #[allow(dead_code)]
     closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(JsValue)>>,
@@ -106,11 +120,16 @@ impl ParallelProcessor {
         Self {
             initialized: false,
             worker_count,
+            available: Rc::new(Cell::new(false)),
             closure: None,
         }
     }
 
     pub fn initialize(&mut self) -> js_sys::Promise {
+        if self.initialized {
+            return js_sys::Promise::resolve(&JsValue::from_bool(self.available.get()));
+        }
+
         #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
         {
             use wasm_bindgen::closure::Closure;
@@ -125,27 +144,13 @@ impl ParallelProcessor {
             );
 
             let worker_count = self.worker_count;
+            let available = self.available.clone();
             let closure = Closure::wrap(Box::new(move |result: JsValue| {
                 web_sys::console::log_1(&format!("Thread pool init result: {:?}", result).into());
-                match result.as_f64() {
-                    Some(_) => {
-                        web_sys::console::log_1(
-                            &format!("WASM thread pool initialized with {} workers", worker_count)
-                                .into(),
-                        );
-                        simulation::set_rayon_available(true);
-                    }
-                    None => {
-                        web_sys::console::warn_1(
-                            &format!(
-                                "Failed to initialize WASM thread pool. Result: {:?}",
-                                result
-                            )
-                            .into(),
-                        );
-                        simulation::set_rayon_available(false);
-                    }
-                }
+                available.set(true);
+                web_sys::console::log_1(
+                    &format!("WASM thread pool initialized with {worker_count} workers").into(),
+                );
             }) as Box<dyn FnMut(JsValue)>);
 
             // Store the closure so it doesn't get dropped
@@ -156,31 +161,12 @@ impl ParallelProcessor {
 
         #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
         {
-            // Native target - initialize rayon thread pool
-            use rayon::ThreadPoolBuilder;
-
-            match ThreadPoolBuilder::new()
-                .num_threads(self.worker_count)
-                .build_global()
-            {
-                Ok(_) => {
-                    simulation::set_rayon_available(true);
-                    web_sys::console::log_1(
-                        &format!(
-                            "Native thread pool initialized with {} workers",
-                            self.worker_count
-                        )
-                        .into(),
-                    );
-                }
-                Err(_) => {
-                    simulation::set_rayon_available(false);
-                    web_sys::console::warn_1(&"Failed to initialize native thread pool".into());
-                }
-            }
-
-            self.initialized = true;
-            js_sys::Promise::resolve(&JsValue::NULL)
+            self.initialized = false;
+            self.available.set(false);
+            web_sys::console::warn_1(
+                &"Threaded WASM support was not compiled into this package".into(),
+            );
+            js_sys::Promise::resolve(&JsValue::FALSE)
         }
     }
 
@@ -193,7 +179,7 @@ impl ParallelProcessor {
     }
 
     pub fn is_rayon_available(&self) -> bool {
-        simulation::is_rayon_available()
+        self.available.get()
     }
 }
 
@@ -203,18 +189,11 @@ impl ParallelProcessor {
 
 #[cfg(target_arch = "wasm32")]
 fn get_optimal_worker_count() -> usize {
-    #[cfg(target_arch = "wasm32")]
-    {
-        // Use fewer workers for testing - start with 2
-        2
-    }
+    let cores = web_sys::window()
+        .map(|window| window.navigator().hardware_concurrency() as usize)
+        .unwrap_or(2);
 
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4)
-    }
+    cores.clamp(1, 8)
 }
 
 #[cfg(target_arch = "wasm32")]

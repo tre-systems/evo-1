@@ -1,5 +1,23 @@
 #[cfg(not(target_arch = "wasm32"))]
-use std::env;
+use clap::Parser;
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Parser, Debug)]
+#[command(author, version, about = "Run BattleO as a native headless simulation")]
+struct Args {
+    #[arg(default_value_t = 2.0)]
+    duration_minutes: f64,
+    #[arg(default_value_t = 20.0)]
+    speed_multiplier: f64,
+    #[arg(default_value_t = 500)]
+    initial_agents: usize,
+    #[arg(default_value_t = 500)]
+    initial_resources: usize,
+    #[arg(default_value_t = 3000)]
+    max_agents: usize,
+    #[arg(default_value_t = 2000)]
+    max_resources: usize,
+}
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -9,29 +27,14 @@ fn main() {
     println!("=== BattleO Headless Simulation ===");
     println!("Running high-performance evolutionary simulation...\n");
 
-    // Parse command line arguments
-    let args: Vec<String> = env::args().collect();
-
-    let config = if args.len() >= 7 {
-        // Custom configuration from command line
-        HeadlessConfig {
-            duration_minutes: args[1].parse().unwrap_or(2.0),
-            speed_multiplier: args[2].parse().unwrap_or(20.0),
-            initial_agents: args[3].parse().unwrap_or(500),
-            initial_resources: args[4].parse().unwrap_or(500),
-            max_agents: args[5].parse().unwrap_or(3000),
-            max_resources: args[6].parse().unwrap_or(2000),
-        }
-    } else {
-        // Default configuration
-        HeadlessConfig {
-            duration_minutes: 2.0,  // Run for 2 minutes
-            speed_multiplier: 20.0, // 20x faster than real-time
-            initial_agents: 500,    // Start with 500 agents
-            initial_resources: 500, // Start with 500 resources
-            max_agents: 3000,       // Maximum 3000 agents
-            max_resources: 2000,    // Maximum 2000 resources
-        }
+    let args = Args::parse();
+    let config = HeadlessConfig {
+        duration_minutes: args.duration_minutes,
+        speed_multiplier: args.speed_multiplier,
+        initial_agents: args.initial_agents,
+        initial_resources: args.initial_resources,
+        max_agents: args.max_agents,
+        max_resources: args.max_resources,
     };
 
     println!("Configuration:");

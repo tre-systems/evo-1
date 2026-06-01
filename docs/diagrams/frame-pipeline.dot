@@ -46,8 +46,9 @@ digraph BattleOFramePipeline {
   ];
 
   start [label=<<B>Simulation::update</B><BR/><FONT POINT-SIZE="15">delta time and timers</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  event_start [label=<<B>Begin frame ledger</B><BR/><FONT POINT-SIZE="15">clear per-frame events</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
   grid [label=<<B>Refresh SpatialGrid</B><BR/><FONT POINT-SIZE="15">one rebuild per frame</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-  rayon [label=<<B>Rayon available?</B>>, shape=diamond, style=filled, width=2.25, height=1.05, fillcolor="#ffffff", color="#1f2f46", penwidth=2.4];
+  rayon [label=<<B>parallel_resources?</B>>, shape=diamond, style=filled, width=2.25, height=1.05, fillcolor="#ffffff", color="#1f2f46", penwidth=2.4];
 
   subgraph cluster_resource_parallel {
     graph [
@@ -74,7 +75,7 @@ digraph BattleOFramePipeline {
   }
 
   resource_seq [label=<<B>Sequential resource update</B><BR/><FONT POINT-SIZE="15">query_mut pass</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-  consumption [label=<<B>Handle consumption</B><BR/><FONT POINT-SIZE="15">collect targets, then mutate</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  consumption [label=<<B>Spatial consumption</B><BR/><FONT POINT-SIZE="15">resources and predator/prey events</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
 
   subgraph cluster_agents {
     graph [
@@ -100,12 +101,12 @@ digraph BattleOFramePipeline {
     collect_agents -> update_agents -> nearby [style=dashed, label="lookup", color="#6b7280", fontcolor="#6b7280"];
   }
 
-  death [label=<<B>Handle death</B><BR/><FONT POINT-SIZE="15">collect removals</FONT>>, fillcolor="#fff1f2:#ffffff", color="#dc2626"];
-  reproduction [label=<<B>Handle reproduction</B><BR/><FONT POINT-SIZE="15">parent candidates, children</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  death [label=<<B>Handle death</B><BR/><FONT POINT-SIZE="15">despawn and record deaths</FONT>>, fillcolor="#fff1f2:#ffffff", color="#dc2626"];
+  reproduction [label=<<B>Handle reproduction</B><BR/><FONT POINT-SIZE="15">spawn and record births</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
   depletion [label=<<B>Remove depleted resources</B><BR/><FONT POINT-SIZE="15">despawn zero-energy resources</FONT>>, fillcolor="#fff1f2:#ffffff", color="#dc2626"];
   end [label=<<B>Committed frame state</B><BR/><FONT POINT-SIZE="15">ready for stats or rendering</FONT>>, fillcolor="#d8f5de:#effcf2", color="#15803d", penwidth=3.0];
 
-  start -> grid -> rayon;
+  start -> event_start -> grid -> rayon;
   rayon -> collect_resources [label="yes", lhead=cluster_resource_parallel];
   rayon -> resource_seq [label="no"];
   apply_resources -> consumption [ltail=cluster_resource_parallel];

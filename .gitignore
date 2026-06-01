@@ -16,6 +16,7 @@ Thumbs.db
 
 # Logs
 *.log
+.playwright-cli/
 
 # Temporary files
 *.tmp

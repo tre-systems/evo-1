@@ -1,4 +1,4 @@
-use crate::simulation::{Simulation, SimulationConfig, SimulationStats};
+use crate::simulation::{RuntimeCapabilities, Simulation, SimulationConfig, SimulationStats};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -80,9 +80,9 @@ pub struct HeadlessSimulation {
 impl HeadlessSimulation {
     pub fn new(config: HeadlessConfig) -> Self {
         // Initialize rayon for parallel processing
-        use crate::simulation;
-
-        let thread_count = num_cpus::get();
+        let thread_count = std::thread::available_parallelism()
+            .map(|threads| threads.get())
+            .unwrap_or(1);
         if rayon::ThreadPoolBuilder::new()
             .num_threads(thread_count)
             .build_global()
@@ -93,16 +93,16 @@ impl HeadlessSimulation {
             println!("Rayon thread pool already initialized; reusing global pool");
         }
 
-        // Mark rayon as available
-        simulation::set_rayon_available(true);
-
-        let simulation = Simulation::new_with_config(SimulationConfig {
-            initial_agents: config.initial_agents,
-            initial_resources: config.initial_resources,
-            max_agents: config.max_agents,
-            max_resources: config.max_resources,
-            ..SimulationConfig::default()
-        });
+        let simulation = Simulation::new_with_config_and_capabilities(
+            SimulationConfig {
+                initial_agents: config.initial_agents,
+                initial_resources: config.initial_resources,
+                max_agents: config.max_agents,
+                max_resources: config.max_resources,
+                ..SimulationConfig::default()
+            },
+            RuntimeCapabilities::native_parallel(),
+        );
 
         Self {
             simulation,
@@ -177,11 +177,8 @@ impl HeadlessSimulation {
         }
 
         // Calculate reproduction/death stats
-        let initial_agents = self.config.initial_agents;
-        let current_agents = stats.agent_count;
-        let total_born = current_agents.saturating_sub(initial_agents);
-        self.diagnostics.total_reproductions = total_born;
-        self.diagnostics.total_deaths = initial_agents.saturating_sub(current_agents) + total_born;
+        self.diagnostics.total_reproductions = stats.total_birth_events;
+        self.diagnostics.total_deaths = stats.total_death_events;
 
         // Calculate quality score
         self.diagnostics.simulation_quality_score = self.calculate_quality_score();

@@ -1,23 +1,24 @@
 use crate::agent::Agent;
 use crate::ecs::EcsWorld;
-use crate::genes::Genes;
 use crate::resource::Resource;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 // ============================================================================
-// STATIC STATE FOR RAYON AVAILABILITY
+// RUNTIME CAPABILITIES
 // ============================================================================
 
-static RAYON_AVAILABLE: AtomicBool = AtomicBool::new(false);
-
-pub fn set_rayon_available(available: bool) {
-    RAYON_AVAILABLE.store(available, Ordering::SeqCst);
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeCapabilities {
+    pub parallel_resources: bool,
 }
 
-pub fn is_rayon_available() -> bool {
-    RAYON_AVAILABLE.load(Ordering::SeqCst)
+impl RuntimeCapabilities {
+    pub fn native_parallel() -> Self {
+        Self {
+            parallel_resources: true,
+        }
+    }
 }
 
 // ============================================================================
@@ -38,12 +39,17 @@ pub struct SimulationStats {
     pub max_generation: u32,
     pub total_kills: u32,
     pub average_fitness: f64,
-    // Debug stats for resource consumption
+    // Event and resource diagnostics
     pub total_resource_energy: f64,
     pub average_resource_energy: f64,
     pub resources_being_consumed: usize,
     pub consumption_events_this_frame: usize,
     pub total_consumption_events: usize,
+    pub birth_events_this_frame: usize,
+    pub death_events_this_frame: usize,
+    pub kill_events_this_frame: usize,
+    pub total_birth_events: usize,
+    pub total_death_events: usize,
     pub average_agent_energy: f64,
     pub agents_with_targets: usize,
 }
@@ -63,12 +69,17 @@ impl Default for SimulationStats {
             max_generation: 0,
             total_kills: 0,
             average_fitness: 0.0,
-            // Debug stats for resource consumption
+            // Event and resource diagnostics
             total_resource_energy: 0.0,
             average_resource_energy: 0.0,
             resources_being_consumed: 0,
             consumption_events_this_frame: 0,
             total_consumption_events: 0,
+            birth_events_this_frame: 0,
+            death_events_this_frame: 0,
+            kill_events_this_frame: 0,
+            total_birth_events: 0,
+            total_death_events: 0,
             average_agent_energy: 0.0,
             agents_with_targets: 0,
         }
@@ -111,6 +122,7 @@ impl Default for SimulationConfig {
 pub struct Simulation {
     ecs_world: EcsWorld,
     config: SimulationConfig,
+    runtime_capabilities: RuntimeCapabilities,
     time: f64,
     resource_spawn_timer: f64,
 }
@@ -136,12 +148,20 @@ impl Simulation {
         Self {
             ecs_world,
             config,
+            runtime_capabilities: RuntimeCapabilities::default(),
             time: 0.0,
             resource_spawn_timer: 0.0,
         }
     }
 
     pub fn new_with_config(config: SimulationConfig) -> Self {
+        Self::new_with_config_and_capabilities(config, RuntimeCapabilities::default())
+    }
+
+    pub fn new_with_config_and_capabilities(
+        config: SimulationConfig,
+        runtime_capabilities: RuntimeCapabilities,
+    ) -> Self {
         let ecs_world = EcsWorld::new_with_population(
             config.width,
             config.height,
@@ -154,6 +174,7 @@ impl Simulation {
         Self {
             ecs_world,
             config,
+            runtime_capabilities,
             time: 0.0,
             resource_spawn_timer: 0.0,
         }
@@ -163,12 +184,13 @@ impl Simulation {
         let delta_time = 10.0 / 60.0; // 10x faster simulation
         self.time += delta_time;
         self.resource_spawn_timer += delta_time;
+        self.ecs_world.begin_frame();
 
         // Update spatial grid for efficient neighbor lookups
         self.ecs_world.update_spatial_grid();
 
         // Update resources (can be parallelized)
-        if is_rayon_available() {
+        if self.runtime_capabilities.parallel_resources {
             self.update_resources_parallel(delta_time);
         } else {
             self.update_resources_sequential(delta_time);
@@ -298,6 +320,14 @@ impl Simulation {
         self.resource_spawn_timer = 0.0;
     }
 
+    pub fn set_runtime_capabilities(&mut self, runtime_capabilities: RuntimeCapabilities) {
+        self.runtime_capabilities = runtime_capabilities;
+    }
+
+    pub fn runtime_capabilities(&self) -> RuntimeCapabilities {
+        self.runtime_capabilities
+    }
+
     pub fn get_stats(&self) -> SimulationStats {
         let agent_count = self.ecs_world.get_agent_count();
         let resource_count = self.ecs_world.get_resource_count();
@@ -314,14 +344,19 @@ impl Simulation {
                 average_sense_range: 0.0,
                 average_energy_efficiency: 0.0,
                 max_generation: 0,
-                total_kills: 0,
+                total_kills: self.ecs_world.total_kill_events as u32,
                 average_fitness: 0.0,
-                // Debug stats for resource consumption
+                // Event and resource diagnostics
                 total_resource_energy: 0.0,
                 average_resource_energy: 0.0,
                 resources_being_consumed: 0,
-                consumption_events_this_frame: 0,
-                total_consumption_events: 0,
+                consumption_events_this_frame: self.ecs_world.consumption_events_this_frame,
+                total_consumption_events: self.ecs_world.total_consumption_events,
+                birth_events_this_frame: self.ecs_world.birth_events_this_frame,
+                death_events_this_frame: self.ecs_world.death_events_this_frame,
+                kill_events_this_frame: self.ecs_world.kill_events_this_frame,
+                total_birth_events: self.ecs_world.total_birth_events,
+                total_death_events: self.ecs_world.total_death_events,
                 average_agent_energy: 0.0,
                 agents_with_targets: 0,
             };
@@ -369,10 +404,7 @@ impl Simulation {
             .map(|(_, _, _, _, state, _, _)| state.generation)
             .max()
             .unwrap_or(0);
-        let total_kills: u32 = agents
-            .iter()
-            .map(|(_, _, _, _, state, _, _)| state.kills)
-            .sum();
+        let total_kills = self.ecs_world.total_kill_events as u32;
         let average_fitness: f64 = agents
             .iter()
             .map(|(_, _, energy, _, _, _, _)| energy.current / energy.max)
@@ -412,12 +444,17 @@ impl Simulation {
             max_generation,
             total_kills,
             average_fitness,
-            // Debug stats for resource consumption
+            // Event and resource diagnostics
             total_resource_energy,
             average_resource_energy,
             resources_being_consumed: 0, // Will be set by ECS world
             consumption_events_this_frame: self.ecs_world.consumption_events_this_frame,
             total_consumption_events: self.ecs_world.total_consumption_events,
+            birth_events_this_frame: self.ecs_world.birth_events_this_frame,
+            death_events_this_frame: self.ecs_world.death_events_this_frame,
+            kill_events_this_frame: self.ecs_world.kill_events_this_frame,
+            total_birth_events: self.ecs_world.total_birth_events,
+            total_death_events: self.ecs_world.total_death_events,
             average_agent_energy: total_energy / agent_count as f64,
             agents_with_targets,
         }
@@ -436,26 +473,7 @@ impl Simulation {
                 energy: energy.current,
                 max_energy: energy.max,
                 age: age.value,
-                genes: Genes {
-                    speed: genes.speed,
-                    sense_range: genes.sense_range,
-                    size: genes.size,
-                    energy_efficiency: genes.energy_efficiency,
-                    reproduction_threshold: genes.reproduction_threshold,
-                    mutation_rate: genes.mutation_rate,
-                    aggression: genes.aggression,
-                    color_hue: genes.color_hue,
-                    is_predator: genes.is_predator,
-                    hunting_speed: genes.hunting_speed,
-                    attack_power: genes.attack_power,
-                    defense: genes.defense,
-                    stealth: genes.stealth,
-                    pack_mentality: genes.pack_mentality,
-                    territory_size: genes.territory_size,
-                    metabolism: genes.metabolism,
-                    intelligence: genes.intelligence,
-                    stamina: genes.stamina,
-                },
+                genes: genes.clone(),
                 target_x: state.target_x,
                 target_y: state.target_y,
                 state: match state.state {

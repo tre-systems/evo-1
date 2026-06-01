@@ -34,6 +34,7 @@ Adapters should translate platform-specific concerns into calls on `simulation::
 `simulation::Simulation` is the facade for core behavior. It owns:
 
 - `SimulationConfig`
+- `RuntimeCapabilities`
 - simulation time
 - resource spawn timing
 - the ECS world
@@ -69,13 +70,14 @@ Systems identify agents and resources by marker components. New entity categorie
 Each frame follows the same high-level pipeline in `Simulation::update()`:
 
 1. Advance simulation time.
-2. Refresh the spatial grid.
-3. Update resources.
-4. Handle consumption.
-5. Update agents.
-6. Handle death.
-7. Handle reproduction.
-8. Remove depleted resources.
+2. Begin a new frame event ledger.
+3. Refresh the spatial grid.
+4. Update resources.
+5. Handle consumption and predator/prey interactions.
+6. Update agents.
+7. Handle death.
+8. Handle reproduction.
+9. Remove depleted resources.
 
 New per-frame systems should be placed deliberately in this order. Avoid adding hidden updates inside rendering, stats collection, or platform adapters.
 
@@ -91,9 +93,20 @@ When an operation needs to inspect many entities and then mutate the world, firs
 
 This is the main rule that keeps HECS borrowing straightforward. Avoid mutating the world while iterating over broad queries unless the query is already a narrow `query_mut` pass.
 
+### Event Ledger Pattern
+
+Per-frame lifecycle facts are recorded as `FrameEvent` values in `EcsWorld`:
+
+- `ResourceConsumed`
+- `AgentKilled`
+- `AgentDied`
+- `AgentBorn`
+
+The ledger is reset at frame start and counters are derived from events instead of inferred later from final population counts. New systems that create lifecycle facts should record events at the same point they mutate ECS state.
+
 ### Spatial Query Pattern
 
-Neighborhood-dependent agent behavior should go through `SpatialGrid` instead of scanning all entities. The grid is rebuilt once per frame and used by optimized agent updates to find nearby resources. New proximity features, such as predator/prey targeting or flocking, should extend this pattern rather than reintroducing O(n^2) loops.
+Neighborhood-dependent behavior should go through `SpatialGrid` instead of scanning all entities. The grid is rebuilt once per frame and used by resource consumption, predator/prey interactions, and optimized agent targeting. New proximity features, such as flocking or territorial behavior, should extend this pattern rather than reintroducing O(n^2) loops.
 
 ### Two-Phase Parallel Pattern
 
@@ -105,9 +118,13 @@ Parallel work must be split into:
 
 This is currently used for resource updates. Agent updates still use a sequential optimized pass because they depend on mutable ECS state and spatial queries. Do not call parallel iterators over live mutable HECS borrows.
 
+### Runtime Capability Pattern
+
+Platform capability is explicit input to the simulation, not hidden global state. `RuntimeCapabilities` controls whether resource updates use the Rayon path. Native headless runs enable this capability after initializing the global Rayon pool. Browser runs enable it only after `ParallelProcessor.initialize()` succeeds.
+
 ### Compatibility DTO Pattern
 
-The active domain model is ECS. Legacy `agent::Agent`, `genes::Genes`, and `resource::Resource` are compatibility DTOs used by rendering and external API surfaces. Conversion methods live on `Simulation`:
+The active domain model is ECS. Legacy `agent::Agent` and `resource::Resource` are compatibility DTOs used by rendering and external API surfaces. `genes::Genes` re-exports the ECS gene component so there is only one writable gene model. Conversion methods live on `Simulation`:
 
 - `Simulation::get_agents()`
 - `Simulation::get_resources()`
@@ -130,11 +147,10 @@ Headless runs produce `SimulationDiagnostics`, while browser runs expose `Simula
 
 ## Pattern Compliance Review
 
-Current consistency is good in the core frame loop, configuration, collect-then-mutate workflow, and rendering boundary. The main inconsistencies are transitional:
+Current consistency is good in the core frame loop, configuration, collect-then-mutate workflow, spatial interactions, runtime capabilities, and rendering boundary. The main inconsistencies are transitional:
 
-- There are duplicate legacy DTOs and ECS component structs for agents, genes, and resources.
+- There are still legacy DTO structs for agents and resources.
 - `EcsWorld` is still a large module containing components, spatial indexing, world construction, and systems.
-- Some browser UI stats logging is still debug-oriented and should eventually become a toggle or be removed.
 
 These are not immediate correctness problems, but they are the next places to tighten if the project becomes active again.
 
@@ -144,9 +160,8 @@ The code would benefit from these additional patterns:
 
 - **Canonical Domain Model**: make ECS components the only writable model and gradually remove duplicated legacy behavior from `agent.rs`, `genes.rs`, and `resource.rs`.
 - **System Module Pattern**: split `EcsWorld` systems into small modules such as `consumption`, `movement`, `reproduction`, and `lifecycle`.
-- **Event Ledger Pattern**: record births, deaths, kills, and consumption as per-frame events, then derive diagnostics and animations from those events.
 - **Deterministic Run Pattern**: add optional seeded RNG to make headless scenarios reproducible.
-- **Capability Flag Pattern**: expose rendering and parallel-processing capabilities explicitly instead of inferring from UI status text.
+- **Render Snapshot Pattern**: generate compact render snapshots instead of cloning full legacy DTOs every frame.
 
 ## Parallel Processing
 
@@ -155,7 +170,7 @@ BattleO uses true parallel processing in both native Rust and WebAssembly enviro
 ### Overview
 
 - **Native**: Uses rayon thread pool for multi-core processing
-- **WASM**: Uses wasm-bindgen-rayon with Web Workers for true threading
+- **WASM**: Uses wasm-bindgen-rayon with Web Workers for true threading when `RuntimeCapabilities.parallel_resources` is enabled by the browser adapter
 - **Fallback**: Graceful degradation to sequential processing when needed
 
 ### How wasm-bindgen-rayon Works
@@ -181,14 +196,11 @@ WebAssembly doesn't have native threading, but wasm-bindgen-rayon creates JavaSc
 #### Prerequisites
 
 ```bash
-# Install nightly Rust (required for wasm-bindgen-rayon)
-rustup toolchain install nightly
+# Install pinned nightly Rust for threaded WASM
+rustup toolchain install nightly-2024-08-02 --component rust-src --target wasm32-unknown-unknown
 
 # Install wasm-pack
 cargo install wasm-pack
-
-# Add WASM target
-rustup target add wasm32-unknown-unknown --toolchain nightly
 ```
 
 #### Cargo.toml Configuration
@@ -198,7 +210,7 @@ rustup target add wasm32-unknown-unknown --toolchain nightly
 rayon = "1.10"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-rayon = "1.3"
+wasm-bindgen-rayon = { version = "1.3", optional = true, features = ["no-bundler"] }
 web-sys = { version = "0.3", features = ["Navigator"] }
 ```
 
@@ -207,21 +219,22 @@ web-sys = { version = "0.3", features = ["Navigator"] }
 #### Initialization
 
 ```javascript
-import init, { ParallelProcessor } from "./pkg/battleo.js";
+import init, { BattleSimulation, ParallelProcessor } from "./pkg/battleo.js";
 
 async function main() {
   await init();
 
-  // Create parallel processor
+  const simulation = new BattleSimulation("canvas");
   const processor = new ParallelProcessor();
 
   // Initialize thread pool (returns a Promise)
   await processor.initialize();
 
-  // Check if parallel processing is available
   if (processor.is_rayon_available()) {
+    simulation.set_parallel_resources_enabled(true);
     console.log("Parallel processing enabled!");
   } else {
+    simulation.set_parallel_resources_enabled(false);
     console.log("Using sequential fallback");
   }
 }
@@ -230,6 +243,8 @@ async function main() {
 #### Rust Implementation
 
 ```rust
+use std::{cell::Cell, rc::Rc};
+use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_rayon::init_thread_pool;
 
@@ -237,6 +252,8 @@ use wasm_bindgen_rayon::init_thread_pool;
 pub struct ParallelProcessor {
     initialized: bool,
     worker_count: usize,
+    available: Rc<Cell<bool>>,
+    closure: Option<Closure<dyn FnMut(JsValue)>>,
 }
 
 #[wasm_bindgen]
@@ -246,20 +263,12 @@ impl ParallelProcessor {
         {
             use wasm_bindgen_rayon::init_thread_pool;
 
-            // Initialize Web Workers
-            init_thread_pool(self.worker_count).then(|result| {
-                match result {
-                    Ok(_) => {
-                        simulation::set_rayon_available(true);
-                        web_sys::console::log_1(&"Thread pool initialized".into());
-                    }
-                    Err(_) => {
-                        simulation::set_rayon_available(false);
-                        web_sys::console::warn_1(&"Failed to initialize thread pool".into());
-                    }
-                }
-                wasm_bindgen::JsValue::NULL
-            })
+            let available = self.available.clone();
+            let on_ready = Closure::wrap(Box::new(move |_| {
+                available.set(true);
+            }) as Box<dyn FnMut(JsValue)>);
+            self.closure = Some(on_ready);
+            init_thread_pool(self.worker_count).then(self.closure.as_ref().unwrap())
         }
     }
 }
