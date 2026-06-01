@@ -46,7 +46,7 @@ the organization/repository Actions secrets:
 The action deploys the generated `dist/` bundle with:
 
 ```bash
-npx wrangler pages deploy dist --project-name evo-1 --branch main
+npx --yes wrangler pages deploy dist --project-name evo-1 --branch main
 ```
 
 For a Cloudflare Pages project connected directly to GitHub instead:
