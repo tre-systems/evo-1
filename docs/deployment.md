@@ -36,7 +36,20 @@ npm run deploy
 
 ## Git Integration
 
-For a Cloudflare Pages project connected to GitHub:
+GitHub Actions deploys to Cloudflare Pages after CI passes on pushes to `main`
+and the active `feature/parallel-evolution-refactor` branch. The deploy job uses
+the organization/repository Actions secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+The action deploys the generated `dist/` bundle with:
+
+```bash
+npx wrangler pages deploy dist --project-name evo-1 --branch main
+```
+
+For a Cloudflare Pages project connected directly to GitHub instead:
 
 | Setting | Value |
 | --- | --- |

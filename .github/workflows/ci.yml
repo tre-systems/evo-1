@@ -63,3 +63,40 @@ jobs:
 
       - name: Check Cloudflare Pages bundle
         run: ./scripts/build-pages.sh
+
+  deploy-pages:
+    name: Deploy Cloudflare Pages
+    runs-on: ubuntu-latest
+    needs: rust
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/feature/parallel-evolution-refactor'))
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install nightly Rust for threaded WASM
+        run: rustup toolchain install nightly-2024-08-02 --component rust-src --target wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked --version 0.13.1
+
+      - name: Build Cloudflare Pages bundle
+        run: ./scripts/build-pages.sh
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=evo-1 --branch=main
