@@ -278,6 +278,55 @@ mod tests {
         assert_eq!(stats.resource_count, 34);
     }
 
+    #[test]
+    fn test_seeded_runs_are_reproducible() {
+        let first = run_seeded_scenario(42, 240);
+        let second = run_seeded_scenario(42, 240);
+
+        assert_eq!(first.agent_count, second.agent_count);
+        assert_eq!(first.resource_count, second.resource_count);
+        assert_eq!(first.max_generation, second.max_generation);
+        assert_eq!(first.total_birth_events, second.total_birth_events);
+        assert_eq!(first.total_death_events, second.total_death_events);
+        assert_eq!(
+            first.average_speed.to_bits(),
+            second.average_speed.to_bits()
+        );
+        assert_eq!(
+            first.average_energy_efficiency.to_bits(),
+            second.average_energy_efficiency.to_bits()
+        );
+    }
+
+    #[test]
+    fn test_seeded_ecology_reaches_later_generations() {
+        let stats = run_seeded_scenario(7, 720);
+
+        assert!(stats.agent_count > 0);
+        assert!(stats.agent_count <= 90);
+        assert!(stats.max_generation >= 3);
+        assert!(stats.total_birth_events > 0);
+        assert_eq!(stats.resource_count, 100);
+    }
+
+    fn run_seeded_scenario(seed: u64, steps: usize) -> simulation::SimulationStats {
+        let config = simulation::SimulationConfig {
+            initial_agents: 50,
+            initial_resources: 100,
+            max_agents: 150,
+            max_resources: 150,
+            seed: Some(seed),
+            ..simulation::SimulationConfig::default()
+        };
+        let mut sim = simulation::Simulation::new_with_config(config);
+
+        for _ in 0..steps {
+            sim.update();
+        }
+
+        sim.get_stats()
+    }
+
     #[cfg(target_arch = "wasm32")]
     #[test]
     fn test_parallel_processing() {

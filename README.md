@@ -49,19 +49,19 @@ cargo run --release --locked --bin headless -- 2.0 20 500 500 3000 2000
 The positional arguments are:
 
 ```text
-duration_minutes speed_multiplier initial_agents initial_resources max_agents max_resources
+duration_minutes speed_multiplier initial_agents initial_resources max_agents max_resources [--seed seed]
 ```
 
 Convenience scripts are available:
 
 ```bash
 ./run_simulation.sh
-./run_simulation.sh 1.0 10 200 200
+./run_simulation.sh 1.0 10 200 200 1000 800 202
 ./run_scenarios.sh
 ./run_scenarios.sh quick_test
 ```
 
-`run_scenarios.sh` is the source of truth for the named scenario catalog.
+`run_scenarios.sh` is the source of truth for the named scenario catalog. Named scenarios carry fixed seeds so ecology changes can be compared across runs.
 
 ## Local Checks
 
@@ -83,6 +83,7 @@ node scripts/check-diagrams.mjs
 ## Documentation
 
 - [Architecture and Patterns](docs/implementation.md) - runtime boundaries, module map, frame pipeline, and recurring implementation patterns.
+- [Product Vision](docs/vision.md) - original ambition, research notes, and iteration roadmap.
 - [API Reference](docs/api-reference.md) - public Rust, WASM, and headless interfaces.
 - [Architecture Diagrams](docs/diagrams/README.md) - Graphviz sources, rendered PNGs, conventions, and render commands.
 - [Maintenance Notes](docs/maintenance.md) - required checks, browser smoke test, and deployment status.

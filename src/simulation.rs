@@ -98,6 +98,7 @@ pub struct SimulationConfig {
     pub max_resources: usize,
     pub initial_agents: usize,
     pub initial_resources: usize,
+    pub seed: Option<u64>,
 }
 
 impl Default for SimulationConfig {
@@ -109,6 +110,7 @@ impl Default for SimulationConfig {
             max_resources: 2000,
             initial_agents: 500,
             initial_resources: 500,
+            seed: None,
         }
     }
 }
@@ -133,13 +135,14 @@ impl Default for Simulation {
 impl Simulation {
     pub fn new() -> Self {
         let config = SimulationConfig::default();
-        let ecs_world = EcsWorld::new_with_population(
+        let ecs_world = EcsWorld::new_with_population_and_seed(
             config.width,
             config.height,
             config.max_agents,
             config.max_resources,
             config.initial_agents,
             config.initial_resources,
+            config.seed,
         );
 
         Self {
@@ -158,13 +161,14 @@ impl Simulation {
         config: SimulationConfig,
         runtime_capabilities: RuntimeCapabilities,
     ) -> Self {
-        let ecs_world = EcsWorld::new_with_population(
+        let ecs_world = EcsWorld::new_with_population_and_seed(
             config.width,
             config.height,
             config.max_agents,
             config.max_resources,
             config.initial_agents,
             config.initial_resources,
+            config.seed,
         );
 
         Self {
@@ -201,6 +205,8 @@ impl Simulation {
         self.ecs_world.handle_reproduction();
 
         self.ecs_world.handle_resource_depletion();
+        self.ecs_world
+            .maintain_resource_floor(self.config.initial_resources);
     }
 
     fn update_resources_parallel(&mut self, delta_time: f64) {
@@ -299,8 +305,11 @@ impl Simulation {
     }
 
     pub fn reset(&mut self) {
-        self.ecs_world
-            .reset_with_population(self.config.initial_agents, self.config.initial_resources);
+        self.ecs_world.reset_with_population_and_seed(
+            self.config.initial_agents,
+            self.config.initial_resources,
+            self.config.seed,
+        );
         self.time = 0.0;
     }
 

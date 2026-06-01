@@ -90,6 +90,7 @@ digraph BattleOSystemOverview {
     ];
 
     simulation [label=<<B>Simulation facade</B><BR/><FONT POINT-SIZE="15">config, time, commands, stats</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    seeded_scenarios [label=<<B>Seeded scenarios</B><BR/><FONT POINT-SIZE="15">reproducible ecology probes</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
     capabilities [label=<<B>RuntimeCapabilities</B><BR/><FONT POINT-SIZE="15">explicit parallel resource flag</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
     world [label=<<B>EcsWorld</B><BR/><FONT POINT-SIZE="15">hecs::World + systems</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
     components [label=<<B>ECS components</B><BR/><FONT POINT-SIZE="15">Position, Energy, Genes, tags</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
@@ -98,6 +99,7 @@ digraph BattleOSystemOverview {
     frame_pipeline [label=<<B>Ordered frame pipeline</B><BR/><FONT POINT-SIZE="15">resources, consumption, agents, lifecycle</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
 
     simulation -> world [label="owns"];
+    simulation -> seeded_scenarios [label="configures"];
     simulation -> capabilities [label="owns"];
     world -> components [label="stores"];
     world -> spatial_grid [label="rebuilds each frame"];

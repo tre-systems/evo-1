@@ -5,6 +5,7 @@ Essential documentation for the BattleO evolutionary simulation.
 ## Core Documentation
 
 - **[Architecture and Patterns](implementation.md)** - Runtime boundaries, module map, frame pipeline, and recurring implementation patterns
+- **[Product Vision](vision.md)** - Original ambition, research notes, and iteration roadmap
 - **[Architecture Diagrams](diagrams/README.md)** - Graphviz sources, rendered PNGs, and diagram conventions
 - **[API Reference](api-reference.md)** - Complete API documentation
 - **[Maintenance Notes](maintenance.md)** - Checks, browser smoke tests, and live-site status

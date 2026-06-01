@@ -43,6 +43,7 @@ digraph BattleORuntimeModel {
       <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">max_resources</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">resource cap</FONT></TD></TR>
       <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">initial_agents</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">reset population</FONT></TD></TR>
       <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">initial_resources</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">reset population</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">seed</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">optional deterministic RNG seed</FONT></TD></TR>
     </TABLE>
   >];
 
@@ -52,6 +53,7 @@ digraph BattleORuntimeModel {
       <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">duration_minutes</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">run length</FONT></TD></TR>
       <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">speed_multiplier</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">target steps</FONT></TD></TR>
       <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">initial / max counts</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">mapped into SimulationConfig</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">seed</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">scenario reproducibility</FONT></TD></TR>
     </TABLE>
   >];
 
@@ -96,6 +98,8 @@ digraph BattleORuntimeModel {
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">canvas bounds</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">width / height</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">max counts</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">agent / resource caps</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">spatial_grid</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">SpatialGrid</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">rng</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">world-owned random source</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">target_agents</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">soft carrying capacity basis</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">event counters</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">diagnostic state</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">frame_events</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">consumed / killed / died / born</FONT></TD></TR>
       </TABLE>

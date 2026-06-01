@@ -117,6 +117,12 @@ impl Resource {
             self.deplete_fade = (self.deplete_fade + delta_time * 3.0).min(1.0);
         }
 
+        if !self.is_depleting {
+            let regeneration = self.regeneration_rate * self.max_energy * delta_time;
+            self.energy = (self.energy + regeneration).min(self.max_energy);
+            self.target_energy = self.max_energy;
+        }
+
         let target_size = 3.0 + (self.energy / self.max_energy) * 5.0;
         let size_diff = target_size - self.size;
         if size_diff.abs() > 0.1 {

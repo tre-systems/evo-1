@@ -1,5 +1,5 @@
 use hecs::World;
-use rand::prelude::*;
+use rand::{prelude::*, rngs::StdRng, SeedableRng};
 use std::collections::HashSet;
 
 mod components;
@@ -18,6 +18,7 @@ pub struct EcsWorld {
     pub canvas_height: f64,
     pub max_agents: usize,
     pub max_resources: usize,
+    pub target_agents: usize,
     pub spatial_grid: SpatialGrid,
     pub consumption_events_this_frame: usize,
     pub total_consumption_events: usize,
@@ -28,6 +29,8 @@ pub struct EcsWorld {
     pub total_death_events: usize,
     pub total_kill_events: usize,
     pub frame_events: Vec<FrameEvent>,
+    rng: StdRng,
+    seed: Option<u64>,
 }
 
 impl EcsWorld {
@@ -43,6 +46,26 @@ impl EcsWorld {
         initial_agents: usize,
         initial_resources: usize,
     ) -> Self {
+        Self::new_with_population_and_seed(
+            canvas_width,
+            canvas_height,
+            max_agents,
+            max_resources,
+            initial_agents,
+            initial_resources,
+            None,
+        )
+    }
+
+    pub fn new_with_population_and_seed(
+        canvas_width: f64,
+        canvas_height: f64,
+        max_agents: usize,
+        max_resources: usize,
+        initial_agents: usize,
+        initial_resources: usize,
+        seed: Option<u64>,
+    ) -> Self {
         let world = World::new();
         let spatial_grid = SpatialGrid::new(canvas_width, canvas_height, 50.0);
 
@@ -52,6 +75,7 @@ impl EcsWorld {
             canvas_height,
             max_agents,
             max_resources,
+            target_agents: initial_agents.min(max_agents),
             spatial_grid,
             consumption_events_this_frame: 0,
             total_consumption_events: 0,
@@ -62,6 +86,8 @@ impl EcsWorld {
             total_death_events: 0,
             total_kill_events: 0,
             frame_events: Vec::new(),
+            rng: Self::rng_from_seed(seed),
+            seed,
         };
 
         ecs_world.spawn_initial_population(
@@ -70,6 +96,13 @@ impl EcsWorld {
         );
 
         ecs_world
+    }
+
+    fn rng_from_seed(seed: Option<u64>) -> StdRng {
+        match seed {
+            Some(seed) => StdRng::seed_from_u64(seed),
+            None => StdRng::from_entropy(),
+        }
     }
 
     pub fn update(&mut self) {
@@ -129,7 +162,7 @@ impl EcsWorld {
                 continue;
             }
 
-            let consumption_radius = agent_genes.size * 2.0;
+            let consumption_radius = agent_genes.size * 5.0 + 4.0;
             for resource_entity in
                 self.spatial_grid
                     .get_nearby_entities(agent_pos.x, agent_pos.y, consumption_radius)
@@ -373,6 +406,10 @@ impl EcsWorld {
             }
         }
 
+        let random_turn = self.rng.gen::<f64>() < 0.08;
+        let random_turn_angle = self.rng.gen_range(0.0..2.0 * std::f64::consts::PI);
+        let fallback_angle = self.rng.gen_range(0.0..2.0 * std::f64::consts::PI);
+
         let Ok((pos, vel, energy, age, state, genes)) = self.world.query_one_mut::<(
             &mut Position,
             &mut Velocity,
@@ -386,7 +423,7 @@ impl EcsWorld {
 
         age.value += delta_time;
 
-        let base_energy_cost = (genes.size * 0.2 + genes.speed * 0.1) * delta_time;
+        let base_energy_cost = (genes.size * 0.08 + genes.speed * 0.04) * delta_time;
         let metabolism_factor = genes.metabolism;
         let environmental_factor = 1.0 + (pos.x / canvas_width + pos.y / canvas_height) * 0.001;
         let total_energy_cost = base_energy_cost * metabolism_factor * environmental_factor;
@@ -423,19 +460,15 @@ impl EcsWorld {
             state.target_y = None;
             state.state = AgentStateEnum::Seeking;
 
-            let mut rng = thread_rng();
-
-            if rng.gen::<f64>() < 0.1 {
-                let angle = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
-                vel.dx = angle.cos() * genes.speed;
-                vel.dy = angle.sin() * genes.speed;
+            if random_turn {
+                vel.dx = random_turn_angle.cos() * genes.speed;
+                vel.dy = random_turn_angle.sin() * genes.speed;
             }
 
             let current_speed = (vel.dx * vel.dx + vel.dy * vel.dy).sqrt();
             if current_speed < genes.speed * 0.5 {
-                let angle = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
-                vel.dx = angle.cos() * genes.speed;
-                vel.dy = angle.sin() * genes.speed;
+                vel.dx = fallback_angle.cos() * genes.speed;
+                vel.dy = fallback_angle.sin() * genes.speed;
             }
         }
 
@@ -481,7 +514,7 @@ impl EcsWorld {
                 Some(death_animation.reason.clone())
             } else if energy.current <= 0.0 {
                 Some(DeathReason::Starvation)
-            } else if age.value > 200.0 {
+            } else if age.value > 1000.0 {
                 Some(DeathReason::OldAge)
             } else {
                 None
@@ -504,6 +537,10 @@ impl EcsWorld {
     }
 
     pub fn handle_reproduction(&mut self) {
+        if self.get_agent_count() >= self.reproduction_soft_cap() {
+            return;
+        }
+
         // Find all agents that can reproduce
         let mut potential_parents: Vec<_> = self
             .world
@@ -516,7 +553,9 @@ impl EcsWorld {
             )>()
             .iter()
             .filter(|(entity, _)| self.world.get::<&crate::ecs::AgentTag>(*entity).is_ok())
-            .filter(|(_, (_, energy, age, state, _))| self.can_reproduce(energy, age, state))
+            .filter(|(_, (_, energy, age, state, genes))| {
+                self.can_reproduce(energy, age, state, genes)
+            })
             .map(|(entity, (pos, energy, age, state, genes))| {
                 (
                     entity,
@@ -535,12 +574,13 @@ impl EcsWorld {
         }
 
         // Shuffle to randomize reproduction order
-        let mut rng = thread_rng();
-        potential_parents.shuffle(&mut rng);
+        potential_parents.shuffle(&mut self.rng);
 
         // Try to pair agents for reproduction
         let mut i = 0;
-        while i < potential_parents.len() - 1 && self.get_agent_count() < self.max_agents {
+        while i < potential_parents.len() - 1
+            && self.get_agent_count() < self.reproduction_soft_cap()
+        {
             let (entity1, pos1, energy1, age1, state1, genes1) = &potential_parents[i];
             let (entity2, pos2, energy2, age2, state2, genes2) = &potential_parents[i + 1];
 
@@ -552,11 +592,12 @@ impl EcsWorld {
                 let energy_factor =
                     (energy1.current / energy1.max).min(energy2.current / energy2.max);
                 let age_factor = (age1.value / 5.0).min(age2.value / 5.0).min(1.0); // Reduced age requirement
-                let reproduction_chance = energy_factor * age_factor * 0.3; // Increased to 30% base chance
+                let reproduction_chance = energy_factor * age_factor * 0.25;
 
-                if rng.gen::<f64>() < reproduction_chance {
+                if self.rng.gen::<f64>() < reproduction_chance {
                     let mutation_rate = (genes1.mutation_rate + genes2.mutation_rate) / 2.0;
-                    let offspring_genes = genes1.inherit_from(genes2, mutation_rate);
+                    let offspring_genes =
+                        genes1.inherit_from_with_rng(genes2, mutation_rate, &mut self.rng);
                     let offspring_x = (pos1.x + pos2.x) / 2.0;
                     let offspring_y = (pos1.y + pos2.y) / 2.0;
                     let offspring_generation = state1.generation.max(state2.generation) + 1;
@@ -589,11 +630,11 @@ impl EcsWorld {
                     // Consume some energy from parents
                     if let Ok(mut energy1_mut) = self.world.get::<&mut crate::ecs::Energy>(*entity1)
                     {
-                        energy1_mut.current = (energy1_mut.current - 20.0).max(10.0);
+                        energy1_mut.current = (energy1_mut.current - 25.0).max(15.0);
                     }
                     if let Ok(mut energy2_mut) = self.world.get::<&mut crate::ecs::Energy>(*entity2)
                     {
-                        energy2_mut.current = (energy2_mut.current - 20.0).max(10.0);
+                        energy2_mut.current = (energy2_mut.current - 25.0).max(15.0);
                     }
                 }
             }
@@ -601,8 +642,19 @@ impl EcsWorld {
         }
     }
 
-    fn can_reproduce(&self, energy: &Energy, age: &Age, state: &AgentState) -> bool {
-        energy.current > 20.0 && age.value > 1.0 && age.value - state.last_reproduction > 0.5
+    fn can_reproduce(&self, energy: &Energy, age: &Age, state: &AgentState, genes: &Genes) -> bool {
+        energy.current >= genes.reproduction_threshold
+            && energy.current / energy.max > 0.6
+            && age.value > 8.0
+            && age.value - state.last_reproduction > 10.0
+    }
+
+    fn reproduction_soft_cap(&self) -> usize {
+        if self.target_agents == 0 {
+            return self.max_agents;
+        }
+
+        (self.target_agents + (self.target_agents * 3 / 4)).min(self.max_agents)
     }
 
     fn distance(&self, pos1: &Position, pos2: &Position) -> f64 {
@@ -610,8 +662,7 @@ impl EcsWorld {
     }
 
     fn spawn_agent(&mut self, x: f64, y: f64, genes: Genes, generation: u32) -> hecs::Entity {
-        let mut rng = thread_rng();
-        let angle = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
+        let angle = self.rng.gen_range(0.0..2.0 * std::f64::consts::PI);
         let size_value = genes.size * 3.0;
 
         self.world.spawn((
@@ -621,8 +672,8 @@ impl EcsWorld {
                 dy: angle.sin() * genes.speed,
             },
             Energy {
-                current: 30.0,
-                max: 100.0,
+                current: 70.0,
+                max: 120.0,
             },
             Age { value: 0.0 },
             genes,
@@ -649,25 +700,24 @@ impl EcsWorld {
     }
 
     pub fn spawn_resource(&mut self) {
-        let mut rng = thread_rng();
-        let x = rng.gen_range(0.0..self.canvas_width);
-        let y = rng.gen_range(0.0..self.canvas_height);
+        let x = self.rng.gen_range(0.0..self.canvas_width);
+        let y = self.rng.gen_range(0.0..self.canvas_height);
 
-        let initial_energy = rng.gen_range(15.0..40.0);
-        let max_energy = rng.gen_range(30.0..60.0);
+        let initial_energy = self.rng.gen_range(40.0..90.0);
+        let max_energy = self.rng.gen_range(70.0..120.0);
 
         self.world.spawn((
             Position { x, y },
             Resource {
-                energy: initial_energy, // Start with initial energy so resources are immediately available
+                energy: initial_energy,
                 max_energy,
                 size: 3.0,
-                growth_rate: rng.gen_range(0.1..0.5),
-                regeneration_rate: rng.gen_range(0.02..0.1),
+                growth_rate: self.rng.gen_range(0.1..0.5),
+                regeneration_rate: self.rng.gen_range(0.08..0.18),
                 age: 0.0,
-                target_energy: initial_energy,
-                is_spawning: false, // Start fully spawned
-                spawn_fade: 1.0,    // Start fully spawned and immediately available
+                target_energy: max_energy,
+                is_spawning: false,
+                spawn_fade: 1.0,
                 is_depleting: false,
                 deplete_fade: 0.0,
             },
@@ -677,24 +727,28 @@ impl EcsWorld {
     }
 
     fn spawn_initial_population(&mut self, initial_agents: usize, initial_resources: usize) {
-        let mut rng = thread_rng();
-
-        // Spawn initial agents
         for _ in 0..initial_agents {
-            let x = rng.gen_range(0.0..self.canvas_width);
-            let y = rng.gen_range(0.0..self.canvas_height);
+            let x = self.rng.gen_range(0.0..self.canvas_width);
+            let y = self.rng.gen_range(0.0..self.canvas_height);
             let genes = self.generate_random_genes();
             self.spawn_agent(x, y, genes, 0);
         }
 
-        // Spawn initial resources
         for _ in 0..initial_resources {
             self.spawn_resource();
         }
     }
 
-    fn generate_random_genes(&self) -> Genes {
-        Genes::new()
+    fn generate_random_genes(&mut self) -> Genes {
+        Genes::random_with_rng(&mut self.rng)
+    }
+
+    pub fn maintain_resource_floor(&mut self, target_resources: usize) {
+        let target_resources = target_resources.min(self.max_resources);
+        let deficit = target_resources.saturating_sub(self.get_resource_count());
+        for _ in 0..deficit.min(8) {
+            self.spawn_resource();
+        }
     }
 
     pub fn get_agent_count(&self) -> usize {
@@ -740,8 +794,20 @@ impl EcsWorld {
     }
 
     pub fn reset_with_population(&mut self, initial_agents: usize, initial_resources: usize) {
+        self.reset_with_population_and_seed(initial_agents, initial_resources, self.seed);
+    }
+
+    pub fn reset_with_population_and_seed(
+        &mut self,
+        initial_agents: usize,
+        initial_resources: usize,
+        seed: Option<u64>,
+    ) {
         self.world = World::new();
         self.spatial_grid.clear();
+        self.rng = Self::rng_from_seed(seed);
+        self.seed = seed;
+        self.target_agents = initial_agents.min(self.max_agents);
         self.consumption_events_this_frame = 0;
         self.total_consumption_events = 0;
         self.birth_events_this_frame = 0;

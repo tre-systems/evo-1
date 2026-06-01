@@ -13,6 +13,7 @@ pub struct HeadlessConfig {
     pub initial_resources: usize,
     pub max_agents: usize,
     pub max_resources: usize,
+    pub seed: Option<u64>,
 }
 
 impl Default for HeadlessConfig {
@@ -24,6 +25,7 @@ impl Default for HeadlessConfig {
             initial_resources: 500,
             max_agents: 3000,
             max_resources: 2000,
+            seed: None,
         }
     }
 }
@@ -99,6 +101,7 @@ impl HeadlessSimulation {
                 initial_resources: config.initial_resources,
                 max_agents: config.max_agents,
                 max_resources: config.max_resources,
+                seed: config.seed,
                 ..SimulationConfig::default()
             },
             RuntimeCapabilities::native_parallel(),

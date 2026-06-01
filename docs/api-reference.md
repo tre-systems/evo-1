@@ -14,6 +14,7 @@ let config = SimulationConfig {
     max_resources: 2000,
     initial_agents: 500,
     initial_resources: 500,
+    seed: Some(42),
 };
 
 let mut simulation = Simulation::new_with_config_and_capabilities(
@@ -53,10 +54,12 @@ pub struct SimulationConfig {
     pub max_resources: usize,
     pub initial_agents: usize,
     pub initial_resources: usize,
+    pub seed: Option<u64>,
 }
 ```
 
 Initial counts are clamped to the max counts when the ECS world is created or reset.
+When `seed` is set, initial placement, random movement, inheritance, reproduction pairing, and resource spawning are reproducible for the same update sequence.
 
 ### `RuntimeCapabilities`
 
@@ -148,6 +151,7 @@ Use the binary for normal runs:
 
 ```bash
 cargo run --release --locked --bin headless -- 2.0 20 500 500 3000 2000
+cargo run --release --locked --bin headless -- 0.1 20 100 200 500 500 --seed 42
 ```
 
 Use the library runner for Rust callers:
@@ -170,6 +174,7 @@ pub struct HeadlessConfig {
     pub initial_resources: usize,
     pub max_agents: usize,
     pub max_resources: usize,
+    pub seed: Option<u64>,
 }
 ```
 

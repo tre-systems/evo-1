@@ -53,7 +53,13 @@ Callers should use `Simulation` for construction, reset, updates, counts, stats,
 
 Population limits and initial counts flow through `SimulationConfig`. `Simulation::new_with_config_and_capabilities` is the most explicit constructor because it records both simulation size and runtime feature support.
 
-Initial counts are clamped to maximum counts when the ECS world is created or reset. Avoid adding constructors that bypass this path.
+Initial counts are clamped to maximum counts when the ECS world is created or reset. Optional seeds flow through the same config path so deterministic scenarios and browser defaults use the same constructor rules. Avoid adding constructors that bypass this path.
+
+### Seeded Scenario
+
+`SimulationConfig::seed` and `HeadlessConfig::seed` make experiments reproducible. A seeded run owns its random number generator inside `EcsWorld`; systems should draw randomness from that world-owned generator rather than creating ad hoc thread-local generators.
+
+Use seeds for scenario scripts, regression tests, and behavior probes. Leave the seed empty for normal browser exploration when freshness matters more than repeatability.
 
 ### Explicit Runtime Capability
 
@@ -89,6 +95,7 @@ Components should stay data-oriented. Behavior belongs in ECS system functions, 
 7. Despawn dead agents and record deaths.
 8. Reproduce eligible agents and record births.
 9. Remove depleted resources.
+10. Replenish resources back toward the scenario floor.
 
 Preserve this ordering unless the behavior change explicitly requires a different causality model. In particular, stats and rendering assume a committed frame after lifecycle cleanup.
 
@@ -170,9 +177,9 @@ The full local check suite is [scripts/check.sh](../scripts/check.sh). It covers
 These are the current architecture pressure points to address before adding larger features:
 
 - Split the largest ECS systems into focused system modules once behavior changes require it. Today they are still understandable in one file, but `EcsWorld` is the main growth risk.
-- Make deterministic seeded runs a first-class option for reproducible experiments. Current runs use thread-local randomness directly.
 - Replace full agent/resource DTO cloning with compact render-specific snapshots if browser rendering or API serialization becomes a bottleneck.
 - Collapse the resource `Size` duplication. Resource entities currently carry both `Resource::size` and a `Size` component, so future resource-rendering changes should pick one source of truth.
+- Split richer agent decision-making into explicit systems as `Fleeing`, `Fighting`, mate seeking, and strategy policy behavior become real.
 
 ## Documentation Boundary
 

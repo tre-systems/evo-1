@@ -36,6 +36,12 @@ For a quick native behavior smoke test:
 ./run_simulation.sh 0.01 1 10 20 100 100
 ```
 
+For a reproducible ecology smoke test that should reach later generations:
+
+```bash
+./run_simulation.sh 0.01 20 50 100 150 150 7
+```
+
 ## Browser Smoke Test
 
 After building `pkg/`, run:

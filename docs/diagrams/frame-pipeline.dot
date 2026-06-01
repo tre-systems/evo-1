@@ -104,6 +104,7 @@ digraph BattleOFramePipeline {
   death [label=<<B>Handle death</B><BR/><FONT POINT-SIZE="15">despawn and record deaths</FONT>>, fillcolor="#fff1f2:#ffffff", color="#dc2626"];
   reproduction [label=<<B>Handle reproduction</B><BR/><FONT POINT-SIZE="15">spawn and record births</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
   depletion [label=<<B>Remove depleted resources</B><BR/><FONT POINT-SIZE="15">despawn zero-energy resources</FONT>>, fillcolor="#fff1f2:#ffffff", color="#dc2626"];
+  replenish [label=<<B>Replenish resources</B><BR/><FONT POINT-SIZE="15">maintain scenario floor</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
   end [label=<<B>Committed frame state</B><BR/><FONT POINT-SIZE="15">ready for stats or rendering</FONT>>, fillcolor="#d8f5de:#effcf2", color="#15803d", penwidth=3.0];
 
   start -> event_start -> grid -> rayon;
@@ -113,5 +114,5 @@ digraph BattleOFramePipeline {
   resource_seq -> consumption;
   consumption -> collect_agents [lhead=cluster_agents];
   nearby -> death [ltail=cluster_agents];
-  death -> reproduction -> depletion -> end;
+  death -> reproduction -> depletion -> replenish -> end;
 }

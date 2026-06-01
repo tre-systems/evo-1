@@ -17,6 +17,8 @@ struct Args {
     max_agents: usize,
     #[arg(default_value_t = 2000)]
     max_resources: usize,
+    #[arg(long)]
+    seed: Option<u64>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -35,6 +37,7 @@ fn main() {
         initial_resources: args.initial_resources,
         max_agents: args.max_agents,
         max_resources: args.max_resources,
+        seed: args.seed,
     };
 
     println!("Configuration:");
@@ -44,6 +47,9 @@ fn main() {
     println!("  Initial resources: {}", config.initial_resources);
     println!("  Max agents: {}", config.max_agents);
     println!("  Max resources: {}", config.max_resources);
+    if let Some(seed) = config.seed {
+        println!("  Seed: {seed}");
+    }
     println!();
 
     let start_time = Instant::now();
