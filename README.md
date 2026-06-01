@@ -133,6 +133,7 @@ Both scripts automatically:
 See [docs/README.md](docs/README.md) for complete documentation covering:
 
 - **Implementation Guide** - Parallel processing, ECS architecture, and WebGL rendering
+- **Architecture Diagrams** - Graphviz sources and rendered PNGs for the system overview, frame pipeline, and runtime model
 - **API Reference** - Complete API documentation
 - **Maintenance Notes** - Checks, browser smoke tests, live-site status, and branch cleanup guidance
 

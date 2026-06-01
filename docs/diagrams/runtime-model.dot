@@ -1,0 +1,190 @@
+digraph BattleORuntimeModel {
+  graph [
+    rankdir=TB,
+    bgcolor="#ffffff",
+    pad="0.55",
+    nodesep="0.55",
+    ranksep="0.90",
+    splines=spline,
+    outputorder=edgesfirst,
+    compound=true,
+    newrank=true,
+    fontname="Avenir",
+    label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
+        <TR><TD><FONT POINT-SIZE="34"><B>Runtime Model</B></FONT></TD></TR>
+      </TABLE>
+    >,
+    labelloc=t,
+    labeljust=c
+  ];
+
+  node [
+    shape=plaintext,
+    fontname="Avenir",
+    fontcolor="#14213d"
+  ];
+
+  edge [
+    color="#263a59",
+    fontname="Avenir",
+    fontsize=13,
+    fontcolor="#3d4a5c",
+    penwidth=2.0,
+    arrowsize=0.85,
+    arrowhead=normal
+  ];
+
+  simulation_config [label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#0f766e">
+      <TR><TD COLSPAN="2" BGCOLOR="#0f766e"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>SimulationConfig</B></FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">width / height</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">world bounds</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">max_agents</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">agent cap</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">max_resources</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">resource cap</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">initial_agents</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">reset population</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">initial_resources</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">reset population</FONT></TD></TR>
+    </TABLE>
+  >];
+
+  headless_config [label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#2f80ed">
+      <TR><TD COLSPAN="2" BGCOLOR="#2f80ed"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>HeadlessConfig</B></FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">duration_minutes</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">run length</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">speed_multiplier</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">target steps</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">initial / max counts</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">mapped into SimulationConfig</FONT></TD></TR>
+    </TABLE>
+  >];
+
+  subgraph cluster_simulation {
+    graph [
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" COLOR="#1e6b43"><B>SIMULATION FACADE</B></FONT></TD></TR>
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12" COLOR="#4e7a61">Callers use Simulation; EcsWorld is the writable domain model behind it.</FONT></TD></TR>
+        </TABLE>
+      >,
+      labelloc=t,
+      labeljust=l,
+      color="#b8e5c8",
+      fillcolor="#f4fbf6",
+      style="rounded,filled",
+      penwidth=1.8,
+      margin=22
+    ];
+
+    simulation [label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#22865a">
+        <TR><TD COLSPAN="2" BGCOLOR="#22865a"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>Simulation</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">ecs_world</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">EcsWorld</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">config</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">SimulationConfig</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">time</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">frame clock</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">resource_spawn_timer</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">reserved</FONT></TD></TR>
+      </TABLE>
+    >];
+
+    ecs_world [label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#22865a">
+        <TR><TD COLSPAN="2" BGCOLOR="#22865a"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>EcsWorld</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">world</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">hecs::World</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">canvas bounds</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">width / height</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">max counts</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">agent / resource caps</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">spatial_grid</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">SpatialGrid</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">consumption counters</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">diagnostic state</FONT></TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_entities {
+    graph [
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" COLOR="#1e6b43"><B>ECS ENTITY SHAPES</B></FONT></TD></TR>
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12" COLOR="#4e7a61">Marker tags distinguish entity roles; components remain data-only.</FONT></TD></TR>
+        </TABLE>
+      >,
+      labelloc=t,
+      labeljust=l,
+      color="#b8e5c8",
+      fillcolor="#f4fbf6",
+      style="rounded,filled",
+      penwidth=1.8,
+      margin=22
+    ];
+
+    agent_entity [label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#22865a">
+        <TR><TD COLSPAN="2" BGCOLOR="#22865a"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>Agent entity</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">AgentTag</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">role marker</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Position / Velocity</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">movement</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Energy / Age / Size</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">lifecycle</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Genes</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">evolvable traits</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">AgentState</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">behavior target</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">animations</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">spawn / death</FONT></TD></TR>
+      </TABLE>
+    >];
+
+    resource_entity [label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#22865a">
+        <TR><TD COLSPAN="2" BGCOLOR="#22865a"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>Resource entity</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">ResourceTag</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">role marker</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Position</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">world location</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Resource</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">energy, growth, depletion</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">Size</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">render and collision scale</FONT></TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_outputs {
+    graph [
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" COLOR="#5f3b8a"><B>COMPATIBILITY AND OBSERVATION</B></FONT></TD></TR>
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12" COLOR="#6d4d8d">Read models are generated from ECS snapshots.</FONT></TD></TR>
+        </TABLE>
+      >,
+      labelloc=t,
+      labeljust=l,
+      color="#d6c6ee",
+      fillcolor="#fbf8ff",
+      style="rounded,filled",
+      penwidth=1.8,
+      margin=22
+    ];
+
+    stats [label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#0f766e">
+        <TR><TD COLSPAN="2" BGCOLOR="#0f766e"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>SimulationStats</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">counts</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">agents / resources</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">trait averages</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">speed, size, aggression</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">consumption counters</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">frame and lifetime</FONT></TD></TR>
+      </TABLE>
+    >];
+
+    diagnostics [label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#0f766e">
+        <TR><TD COLSPAN="2" BGCOLOR="#0f766e"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>SimulationDiagnostics</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">duration / steps</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">headless runtime</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">quality flags</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">stable, extinct, explosion</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">quality score</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">experiment summary</FONT></TD></TR>
+      </TABLE>
+    >];
+
+    legacy_dtos [label=<
+      <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7" BGCOLOR="#ffffff" COLOR="#7c3aed">
+        <TR><TD COLSPAN="2" BGCOLOR="#7c3aed"><FONT COLOR="#ffffff" POINT-SIZE="17"><B>Legacy DTOs</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">agent::Agent</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">render/API snapshot</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">resource::Resource</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">render/API snapshot</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">genes::Genes</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">compatibility copy</FONT></TD></TR>
+      </TABLE>
+    >];
+  }
+
+  headless_config -> simulation_config [label="maps counts into"];
+  simulation_config -> simulation [label="constructs / resets"];
+  simulation -> ecs_world [lhead=cluster_simulation, label="owns"];
+  ecs_world -> agent_entity [ltail=cluster_simulation, lhead=cluster_entities, label="spawns and mutates"];
+  ecs_world -> resource_entity [ltail=cluster_simulation, lhead=cluster_entities, label="spawns and mutates"];
+  simulation -> stats [ltail=cluster_simulation, lhead=cluster_outputs, label="aggregates"];
+  simulation -> legacy_dtos [ltail=cluster_simulation, lhead=cluster_outputs, label="converts snapshots"];
+  stats -> diagnostics [ltail=cluster_outputs, label="included in headless run"];
+}

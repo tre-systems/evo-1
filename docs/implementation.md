@@ -2,6 +2,18 @@
 
 Complete technical implementation details for BattleO's core systems.
 
+## Architecture Diagrams
+
+BattleO follows the same diagram convention as the Antenna and swade-toolbox projects: complex architecture diagrams use Graphviz/DOT sources in `docs/diagrams`, rendered PNGs are committed for GitHub/browser viewing, and Mermaid is reserved for small inline Markdown sketches.
+
+Start with these diagrams before changing the core architecture:
+
+![System overview](diagrams/system-overview.png)
+
+![Simulation frame pipeline](diagrams/frame-pipeline.png)
+
+![Runtime model](diagrams/runtime-model.png)
+
 ## Architecture Pattern Catalog
 
 BattleO is easiest to understand as a small set of recurring architectural patterns. These patterns are the intended shape of the codebase and should be used when adding or changing behavior.

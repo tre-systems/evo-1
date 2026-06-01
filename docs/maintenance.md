@@ -16,6 +16,7 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
 cargo check --target wasm32-unknown-unknown
+node scripts/check-diagrams.mjs
 ```
 
 For the threaded browser package build:
