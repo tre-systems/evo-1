@@ -12,205 +12,541 @@
     <link rel="icon" href="data:," />
     <title>BattleO - Evolutionary Simulation</title>
     <style>
-      body {
-        margin: 0;
-        padding: 20px;
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background: #1a1a2e;
-        color: #ffffff;
+      :root {
+        color-scheme: dark;
+        --bg: #090a0f;
+        --panel: rgba(10, 14, 22, 0.84);
+        --panel-strong: rgba(14, 18, 28, 0.96);
+        --panel-soft: rgba(247, 239, 213, 0.06);
+        --text: #f7efd5;
+        --muted: rgba(247, 239, 213, 0.62);
+        --faint: rgba(247, 239, 213, 0.36);
+        --cyan: #55d7e6;
+        --gold: #b9874f;
+        --green: #65d488;
+        --red: #f06f6f;
+        --border: rgba(247, 239, 213, 0.16);
+        --shadow: 0 22px 70px rgba(0, 0, 0, 0.48);
       }
 
-      .container {
-        max-width: 1200px;
-        margin: 0 auto;
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background:
+          linear-gradient(rgba(85, 215, 230, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(85, 215, 230, 0.04) 1px, transparent 1px),
+          var(--bg);
+        background-size:
+          44px 44px,
+          44px 44px,
+          auto;
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      .app-shell {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        min-width: 320px;
+        background: #04070d;
+      }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        background: #03060d;
+      }
+
+      .stage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(9, 10, 15, 0.7), transparent 24%, transparent 76%, rgba(9, 10, 15, 0.64)),
+          linear-gradient(180deg, rgba(9, 10, 15, 0.72), transparent 16%, transparent 82%, rgba(9, 10, 15, 0.82));
+      }
+
+      #canvas {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: max(100vw, 125vh);
+        height: max(100vh, 80vw);
+        transform: translate(-50%, -50%);
+        display: block;
+        background: #050914;
+      }
+
+      .control-panel {
+        position: fixed;
+        top: 18px;
+        left: 18px;
+        z-index: 5;
+        width: min(390px, calc(100vw - 36px));
+        max-height: calc(100vh - 36px);
+        display: grid;
+        grid-template-rows: auto auto auto 1fr;
+        gap: 14px;
+        padding: 16px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background:
+          linear-gradient(180deg, rgba(247, 239, 213, 0.08), transparent 170px),
+          var(--panel);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+        transition:
+          transform 180ms ease,
+          opacity 180ms ease;
+      }
+
+      body[data-panel="closed"] .control-panel {
+        transform: translateX(calc(-100% - 28px));
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .panel-reveal {
+        position: fixed;
+        top: 18px;
+        left: 18px;
+        z-index: 6;
+        min-width: 46px;
+        height: 42px;
+        padding: 0 14px;
+        border: 1px solid rgba(85, 215, 230, 0.48);
+        border-radius: 8px;
+        background: var(--panel-strong);
+        color: var(--text);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+
+      .brand-row {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .eyebrow {
+        margin: 0 0 5px;
+        color: var(--gold);
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
       }
 
       h1 {
-        text-align: center;
-        color: #00d4ff;
-        margin-bottom: 30px;
+        margin: 0;
+        color: var(--text);
+        font-size: clamp(1.55rem, 5vw, 2.35rem);
+        line-height: 0.95;
+        letter-spacing: 0;
+        text-transform: uppercase;
       }
 
-      .controls {
+      .subtitle {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 0.95rem;
+        line-height: 1.35;
+      }
+
+      .panel-actions {
         display: flex;
-        gap: 20px;
-        margin-bottom: 20px;
+        gap: 8px;
+        align-items: center;
         flex-wrap: wrap;
       }
 
       button {
-        padding: 10px 20px;
-        background: #16213e;
-        color: #ffffff;
-        border: 2px solid #00d4ff;
-        border-radius: 5px;
+        min-height: 38px;
+        padding: 0 13px;
+        border: 1px solid rgba(85, 215, 230, 0.42);
+        border-radius: 6px;
+        background: rgba(8, 12, 20, 0.82);
+        color: var(--text);
         cursor: pointer;
-        font-size: 14px;
-        transition: all 0.3s ease;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        transition:
+          background 150ms ease,
+          border-color 150ms ease,
+          color 150ms ease,
+          transform 150ms ease;
       }
 
-      button:hover {
-        background: #00d4ff;
-        color: #1a1a2e;
+      button:hover:not(:disabled) {
+        border-color: var(--cyan);
+        background: rgba(85, 215, 230, 0.14);
+        color: #ffffff;
+      }
+
+      button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+
+      button:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
       }
 
       button:disabled {
-        opacity: 0.5;
+        opacity: 0.42;
         cursor: not-allowed;
       }
 
-      .canvas-container {
-        text-align: center;
-        margin-bottom: 20px;
+      .primary-action {
+        border-color: rgba(185, 135, 79, 0.64);
+        background: linear-gradient(145deg, rgba(185, 135, 79, 0.28), rgba(85, 215, 230, 0.12));
       }
 
-      #canvas {
-        border: 2px solid #00d4ff;
-        border-radius: 5px;
-        background: #0f3460;
+      .hide-button {
+        min-width: 52px;
+        padding: 0 10px;
+        text-align: center;
+      }
+
+      .status {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--cyan);
+        border-radius: 6px;
+        background: rgba(247, 239, 213, 0.055);
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.35;
+      }
+
+      .status.success {
+        border-left-color: var(--green);
+        color: #d9ffe4;
+      }
+
+      .status.error {
+        border-left-color: var(--red);
+        color: #ffd7d7;
+      }
+
+      .loading {
+        color: var(--muted);
+      }
+
+      .metrics {
+        min-height: 0;
+        overflow: auto;
+        padding-right: 2px;
+        scrollbar-color: rgba(85, 215, 230, 0.45) transparent;
+      }
+
+      .metric-section {
+        margin-bottom: 14px;
+      }
+
+      .section-label {
+        margin: 0 0 8px;
+        color: var(--faint);
+        font-size: 0.64rem;
+        font-weight: 900;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
       }
 
       .stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 15px;
-        margin-bottom: 20px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
       }
 
       .stat-card {
-        background: #16213e;
-        padding: 15px;
-        border-radius: 5px;
-        border: 1px solid #00d4ff;
+        min-width: 0;
+        min-height: 68px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: rgba(247, 239, 213, 0.055);
       }
 
       .stat-label {
-        font-size: 12px;
-        color: #888;
+        overflow: hidden;
+        color: var(--faint);
+        font-size: 0.64rem;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-overflow: ellipsis;
         text-transform: uppercase;
-        margin-bottom: 5px;
+        white-space: nowrap;
       }
 
       .stat-value {
-        font-size: 18px;
-        font-weight: bold;
-        color: #00d4ff;
+        margin-top: 7px;
+        color: var(--cyan);
+        font-variant-numeric: tabular-nums;
+        font-size: clamp(1.25rem, 4vw, 1.7rem);
+        font-weight: 900;
+        line-height: 1;
       }
 
-      .status {
-        background: #16213e;
-        padding: 15px;
-        border-radius: 5px;
-        border: 1px solid #00d4ff;
-        margin-bottom: 20px;
+      .stat-card[data-tone="gold"] .stat-value {
+        color: #e7b77d;
       }
 
-      .error {
-        background: #4a1a1a;
-        border-color: #ff4444;
-        color: #ff8888;
+      .stat-card[data-tone="green"] .stat-value {
+        color: var(--green);
       }
 
-      .success {
-        background: #1a4a1a;
-        border-color: #44ff44;
-        color: #88ff88;
+      .stat-card[data-tone="red"] .stat-value {
+        color: #ff8d8d;
       }
 
-      .loading {
-        text-align: center;
-        padding: 40px;
-        font-size: 18px;
-        color: #00d4ff;
+      .screen-plate {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 12px;
+        border: 1px solid rgba(247, 239, 213, 0.12);
+        border-radius: 8px;
+        background: rgba(10, 14, 22, 0.62);
+        box-shadow: 0 14px 50px rgba(0, 0, 0, 0.35);
+        color: var(--muted);
+        backdrop-filter: blur(14px);
+      }
+
+      .screen-plate strong {
+        color: var(--text);
+        font-size: 0.75rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 18px rgba(101, 212, 136, 0.8);
+      }
+
+      body:not([data-running="true"]) .pulse-dot {
+        background: var(--gold);
+        box-shadow: 0 0 18px rgba(185, 135, 79, 0.7);
+      }
+
+      @media (max-width: 720px) {
+        .control-panel {
+          top: auto;
+          right: 10px;
+          bottom: 10px;
+          left: 10px;
+          width: auto;
+          max-height: min(68vh, 620px);
+          padding: 12px;
+        }
+
+        body[data-panel="closed"] .control-panel {
+          transform: translateY(calc(100% + 20px));
+        }
+
+        .panel-reveal {
+          top: auto;
+          bottom: 14px;
+          left: 14px;
+        }
+
+        .screen-plate {
+          right: 10px;
+          bottom: 10px;
+          padding: 8px 10px;
+        }
+
+        body[data-panel="open"] .screen-plate {
+          display: none;
+        }
+
+        .panel-actions {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .panel-actions button {
+          width: 100%;
+        }
+
+        .brand-row {
+          align-items: center;
+        }
+
+        .subtitle {
+          display: none;
+        }
       }
     </style>
   </head>
-  <body>
-    <div class="container">
-      <h1>BattleO - Evolutionary Simulation</h1>
-
-      <div id="status" class="status">
-        <div class="loading">Loading BattleO simulation...</div>
-      </div>
-
-      <div class="controls">
-        <button id="startBtn" disabled>Start Simulation</button>
-        <button id="stopBtn" disabled>Stop Simulation</button>
-        <button id="resetBtn" disabled>Reset</button>
-        <button id="initParallelBtn" disabled>
-          Initialize Parallel Processing
-        </button>
-      </div>
-
-      <div class="canvas-container">
+  <body data-panel="open" data-running="false">
+    <div class="app-shell">
+      <main class="stage" id="stage">
         <canvas id="canvas" width="1000" height="800"></canvas>
-      </div>
+      </main>
 
-      <div class="stats">
-        <div class="stat-card">
-          <div class="stat-label">Agents</div>
-          <div class="stat-value" id="agentCount">0</div>
+      <button id="showPanelBtn" class="panel-reveal" type="button" hidden>
+        Panel
+      </button>
+
+      <aside id="controlPanel" class="control-panel" aria-label="Simulation controls">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">Total Reality Engineering</p>
+            <h1>BattleO</h1>
+            <p class="subtitle">Evolutionary battle sandbox</p>
+          </div>
+          <button
+            id="hidePanelBtn"
+            class="hide-button"
+            type="button"
+            aria-label="Hide control panel"
+            title="Hide control panel"
+          >
+            Hide
+          </button>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Resources</div>
-          <div class="stat-value" id="resourceCount">0</div>
+
+        <div id="status" class="status" aria-live="polite">
+          <div class="loading">Loading simulation...</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Energy</div>
-          <div class="stat-value" id="totalEnergy">0</div>
+
+        <div class="panel-actions">
+          <button id="startBtn" class="primary-action" type="button" disabled>
+            Start
+          </button>
+          <button id="stopBtn" type="button" disabled>Stop</button>
+          <button id="resetBtn" type="button" disabled>Reset</button>
+          <button id="fullscreenBtn" type="button">Full Screen</button>
+          <button id="initParallelBtn" type="button" disabled>Threads</button>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Average Age</div>
-          <div class="stat-value" id="avgAge">0</div>
+
+        <div class="metrics">
+          <section class="metric-section">
+            <p class="section-label">Population</p>
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-label">Agents</div>
+                <div class="stat-value" id="agentCount">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Resources</div>
+                <div class="stat-value" id="resourceCount">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Energy</div>
+                <div class="stat-value" id="totalEnergy">0</div>
+              </div>
+              <div class="stat-card" data-tone="gold">
+                <div class="stat-label">Generation</div>
+                <div class="stat-value" id="maxGen">0</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Ecology</p>
+            <div class="stats">
+              <div class="stat-card" data-tone="red">
+                <div class="stat-label">Kills</div>
+                <div class="stat-value" id="totalKills">0</div>
+              </div>
+              <div class="stat-card" data-tone="green">
+                <div class="stat-label">Births</div>
+                <div class="stat-value" id="totalBirths">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Predators</div>
+                <div class="stat-value" id="predatorAgents">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Prey</div>
+                <div class="stat-value" id="preyAgents">0</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Behavior</p>
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-label">Feeding</div>
+                <div class="stat-value" id="feedingAgents">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Hunting</div>
+                <div class="stat-value" id="huntingAgents">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Fleeing</div>
+                <div class="stat-value" id="fleeingAgents">0</div>
+              </div>
+              <div class="stat-card" data-tone="red">
+                <div class="stat-label">Fighting</div>
+                <div class="stat-value" id="fightingAgents">0</div>
+              </div>
+              <div class="stat-card" data-tone="gold">
+                <div class="stat-label">Reproducing</div>
+                <div class="stat-value" id="reproducingAgents">0</div>
+              </div>
+              <div class="stat-card" data-tone="green">
+                <div class="stat-label">Ready to Mate</div>
+                <div class="stat-value" id="reproductionCandidates">0</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Runtime</p>
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-label">Average Age</div>
+                <div class="stat-value" id="avgAge">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">FPS</div>
+                <div class="stat-value" id="fps">0</div>
+              </div>
+            </div>
+          </section>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Max Generation</div>
-          <div class="stat-value" id="maxGen">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Kills</div>
-          <div class="stat-value" id="totalKills">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Births</div>
-          <div class="stat-value" id="totalBirths">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Predators</div>
-          <div class="stat-value" id="predatorAgents">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Prey</div>
-          <div class="stat-value" id="preyAgents">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Feeding</div>
-          <div class="stat-value" id="feedingAgents">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Hunting</div>
-          <div class="stat-value" id="huntingAgents">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Fleeing</div>
-          <div class="stat-value" id="fleeingAgents">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Fighting</div>
-          <div class="stat-value" id="fightingAgents">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Reproducing</div>
-          <div class="stat-value" id="reproducingAgents">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Ready to Mate</div>
-          <div class="stat-value" id="reproductionCandidates">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">FPS</div>
-          <div class="stat-value" id="fps">0</div>
-        </div>
+      </aside>
+
+      <div class="screen-plate" aria-hidden="true">
+        <span class="pulse-dot"></span>
+        <strong>Live Ecology</strong>
       </div>
     </div>
 
@@ -232,11 +568,25 @@
       const startBtn = document.getElementById("startBtn");
       const stopBtn = document.getElementById("stopBtn");
       const resetBtn = document.getElementById("resetBtn");
+      const fullscreenBtn = document.getElementById("fullscreenBtn");
       const initParallelBtn = document.getElementById("initParallelBtn");
+      const hidePanelBtn = document.getElementById("hidePanelBtn");
+      const showPanelBtn = document.getElementById("showPanelBtn");
+      const controlPanel = document.getElementById("controlPanel");
 
       function updateStatus(message, type = "info") {
         statusDiv.className = `status ${type}`;
         statusDiv.textContent = message;
+      }
+
+      function setPanelOpen(open) {
+        document.body.dataset.panel = open ? "open" : "closed";
+        controlPanel.setAttribute("aria-hidden", open ? "false" : "true");
+        showPanelBtn.hidden = open;
+      }
+
+      function updateRunningState(running) {
+        document.body.dataset.running = running ? "true" : "false";
       }
 
       function updateStats(stats) {
@@ -289,14 +639,16 @@
         if (!simulation) return;
 
         isRunning = true;
+        updateRunningState(true);
         startBtn.disabled = true;
         stopBtn.disabled = false;
         animate();
-        updateStatus("Simulation running...", "success");
+        updateStatus("Simulation running", "success");
       }
 
       function stopSimulation() {
         isRunning = false;
+        updateRunningState(false);
         if (animationId) {
           cancelAnimationFrame(animationId);
           animationId = null;
@@ -315,82 +667,82 @@
         updateStatus("Simulation reset", "info");
       }
 
+      async function toggleFullscreen() {
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen?.();
+          } else {
+            await document.exitFullscreen?.();
+          }
+        } catch (error) {
+          updateStatus(`Full screen unavailable: ${error}`, "error");
+        }
+      }
+
+      function updateFullscreenLabel() {
+        fullscreenBtn.textContent = document.fullscreenElement
+          ? "Exit Full"
+          : "Full Screen";
+      }
+
       async function initializeParallelProcessing() {
         if (!processor || parallelInitialized) return;
 
         try {
           initParallelBtn.disabled = true;
-          updateStatus("Initializing parallel processing...", "info");
+          updateStatus("Initializing worker threads", "info");
           await processor.initialize();
 
           if (processor.is_rayon_available()) {
             parallelInitialized = true;
             simulation?.set_parallel_resources_enabled(true);
-            updateStatus(
-              "Parallel processing enabled! Using Web Workers for true threading.",
-              "success"
-            );
+            updateStatus("Worker threads enabled", "success");
           } else {
             simulation?.set_parallel_resources_enabled(false);
             initParallelBtn.disabled = false;
-            updateStatus(
-              "Parallel processing not available. Using sequential processing.",
-              "error"
-            );
+            updateStatus("Worker threads unavailable", "error");
           }
         } catch (error) {
           simulation?.set_parallel_resources_enabled(false);
           initParallelBtn.disabled = false;
-          updateStatus(
-            `Failed to initialize parallel processing: ${error}`,
-            "error"
-          );
+          updateStatus(`Thread initialization failed: ${error}`, "error");
         }
       }
 
-      // Event listeners
       startBtn.addEventListener("click", startSimulation);
       stopBtn.addEventListener("click", stopSimulation);
       resetBtn.addEventListener("click", resetSimulation);
+      fullscreenBtn.addEventListener("click", toggleFullscreen);
       initParallelBtn.addEventListener("click", initializeParallelProcessing);
+      hidePanelBtn.addEventListener("click", () => setPanelOpen(false));
+      showPanelBtn.addEventListener("click", () => setPanelOpen(true));
+      document.addEventListener("fullscreenchange", updateFullscreenLabel);
 
-      // Initialize the application
       async function main() {
         try {
-          updateStatus("Loading WebAssembly module...", "info");
+          updateStatus("Loading WebAssembly module", "info");
           await init();
 
-          updateStatus("Creating parallel processor...", "info");
+          updateStatus("Preparing runtime", "info");
           processor = new ParallelProcessor();
           initParallelBtn.disabled = false;
 
-          updateStatus("Creating simulation...", "info");
+          updateStatus("Creating simulation", "info");
           simulation = new BattleSimulation("canvas");
 
-          // Log the rendering mode being used
           const renderingMode = simulation.get_rendering_mode();
-          console.log(`🎮 Rendering mode: ${renderingMode}`);
-          updateStatus(
-            `Simulation created using ${renderingMode} rendering`,
-            "success"
-          );
-
-          // Note: Initial population is automatically spawned by the ECS system
-          // No need to manually add agents/resources - they're already there!
+          console.log(`Rendering mode: ${renderingMode}`);
+          updateStatus(`${renderingMode} active`, "success");
 
           updateStats(simulation.get_stats());
 
-          // Enable controls
           startBtn.disabled = false;
           resetBtn.disabled = false;
           initParallelBtn.disabled = false;
 
-          updateStatus(
-            'BattleO simulation ready! Click "Initialize Parallel Processing" for best performance, then "Start Simulation".',
-            "success"
-          );
+          updateStatus("BattleO ready", "success");
         } catch (error) {
-          updateStatus(`Failed to initialize BattleO: ${error}`, "error");
+          updateStatus(`Initialization failed: ${error}`, "error");
           console.error("Initialization error:", error);
         }
       }
