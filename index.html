@@ -128,9 +128,6 @@
   <body>
     <div class="container">
       <h1>BattleO - Evolutionary Simulation</h1>
-      <p style="text-align: center; color: #888; font-size: 12px">
-        Updated: <span id="timestamp"></span>
-      </p>
 
       <div id="status" class="status">
         <div class="loading">Loading BattleO simulation...</div>
@@ -199,7 +196,7 @@
 
       function updateStatus(message, type = "info") {
         statusDiv.className = `status ${type}`;
-        statusDiv.innerHTML = message;
+        statusDiv.textContent = message;
       }
 
       function updateStats(stats) {
@@ -348,11 +345,6 @@
         }
       }
 
-      // Set timestamp for cache busting
-      document.getElementById("timestamp").textContent =
-        new Date().toLocaleString();
-
-      // Start the application
       main();
     </script>
   </body>

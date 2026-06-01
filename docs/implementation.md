@@ -56,7 +56,7 @@ Do not create a default simulation and then add configured entities on top. That
 
 ### ECS Component Pattern
 
-ECS entities are composed from data-only components in `src/ecs.rs`:
+ECS entities are composed from data-only components in `src/ecs/components.rs`:
 
 - common components: `Position`, `Velocity`, `Energy`, `Age`, `Size`
 - agent components: `Genes`, `AgentState`, `DeathAnimation`, `SpawnAnimation`
@@ -150,7 +150,7 @@ Headless runs produce `SimulationDiagnostics`, while browser runs expose `Simula
 Current consistency is good in the core frame loop, configuration, collect-then-mutate workflow, spatial interactions, runtime capabilities, and rendering boundary. The main inconsistencies are transitional:
 
 - There are still legacy DTO structs for agents and resources.
-- `EcsWorld` is still a large module containing components, spatial indexing, world construction, and systems.
+- `EcsWorld` still owns several systems in one file, though components and spatial indexing now live in focused submodules.
 
 These are not immediate correctness problems, but they are the next places to tighten if the project becomes active again.
 
@@ -158,8 +158,8 @@ These are not immediate correctness problems, but they are the next places to ti
 
 The code would benefit from these additional patterns:
 
-- **Canonical Domain Model**: make ECS components the only writable model and gradually remove duplicated legacy behavior from `agent.rs`, `genes.rs`, and `resource.rs`.
-- **System Module Pattern**: split `EcsWorld` systems into small modules such as `consumption`, `movement`, `reproduction`, and `lifecycle`.
+- **System Module Pattern**: continue splitting `EcsWorld` systems into small modules such as `consumption`, `movement`, `reproduction`, and `lifecycle`.
+- **Canonical Domain Model**: gradually replace legacy DTO snapshots with render-specific snapshots.
 - **Deterministic Run Pattern**: add optional seeded RNG to make headless scenarios reproducible.
 - **Render Snapshot Pattern**: generate compact render snapshots instead of cloning full legacy DTOs every frame.
 
@@ -200,7 +200,7 @@ WebAssembly doesn't have native threading, but wasm-bindgen-rayon creates JavaSc
 rustup toolchain install nightly-2024-08-02 --component rust-src --target wasm32-unknown-unknown
 
 # Install wasm-pack
-cargo install wasm-pack
+cargo install wasm-pack --locked --version 0.13.1
 ```
 
 #### Cargo.toml Configuration
@@ -268,7 +268,10 @@ impl ParallelProcessor {
                 available.set(true);
             }) as Box<dyn FnMut(JsValue)>);
             self.closure = Some(on_ready);
-            init_thread_pool(self.worker_count).then(self.closure.as_ref().unwrap())
+            match self.closure.as_ref() {
+                Some(callback) => init_thread_pool(self.worker_count).then(callback),
+                None => js_sys::Promise::reject(&"Thread pool callback was not retained".into()),
+            }
         }
     }
 }
@@ -377,7 +380,6 @@ impl EcsWorld {
             canvas_height,
             max_agents,
             max_resources,
-            resource_spawn_timer: 0.0,
             spatial_grid: SpatialGrid::new(canvas_width, canvas_height, 50.0),
             consumption_events_this_frame: 0,
             total_consumption_events: 0,
@@ -763,7 +765,7 @@ fn render_agent_canvas2d(&self, ctx: &CanvasRenderingContext2d, agent: &Agent) {
     // Draw agent
     ctx.set_fill_style_str(&format!("hsl({}, {}%, {}%)", hue, saturation, lightness));
     ctx.begin_path();
-    ctx.arc(x, y, size, 0.0, 2.0 * std::f64::consts::PI).unwrap();
+    let _ = ctx.arc(x, y, size, 0.0, 2.0 * std::f64::consts::PI);
     ctx.fill();
 
     // Draw border

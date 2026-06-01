@@ -17,7 +17,7 @@ A high-performance evolutionary simulation framework built in Rust with WebAssem
 
 - Rust stable for native builds
 - Nightly Rust for threaded WASM builds
-- wasm-pack for browser packages: `cargo install wasm-pack`
+- wasm-pack for browser packages: `cargo install wasm-pack --locked --version 0.13.1`
 
 ### Build and Run
 
@@ -135,7 +135,7 @@ See [docs/README.md](docs/README.md) for complete documentation covering:
 - **Implementation Guide** - Parallel processing, ECS architecture, and WebGL rendering
 - **Architecture Diagrams** - Graphviz sources and rendered PNGs for the system overview, frame pipeline, and runtime model
 - **API Reference** - Complete API documentation
-- **Maintenance Notes** - Checks, browser smoke tests, live-site status, and branch cleanup guidance
+- **Maintenance Notes** - Checks, browser smoke tests, and live-site status
 
 ## Development
 
@@ -169,7 +169,6 @@ let config = SimulationConfig {
     max_resources: 2000,
     initial_agents: 500,
     initial_resources: 500,
-    resource_spawn_rate: 1.0, // Reserved for automatic resource spawning
 };
 ```
 
@@ -185,7 +184,7 @@ BattleO has native and WASM execution paths, with rayon available for native hea
 - Firefox 79+ (with SharedArrayBuffer)
 - Safari 15.2+ (with SharedArrayBuffer)
 
-**Note**: SharedArrayBuffer requires proper CORS headers for security.
+**Note**: SharedArrayBuffer requires COOP/COEP headers for cross-origin isolation.
 
 ## License
 

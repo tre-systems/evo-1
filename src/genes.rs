@@ -1,5 +1,5 @@
 use rand::prelude::*;
-use rand_distr::Normal;
+use rand_distr::StandardNormal;
 
 pub use crate::ecs::Genes;
 
@@ -194,36 +194,9 @@ impl Genes {
         let mut gene = gene1 * blend_factor + gene2 * (1.0 - blend_factor);
 
         if rng.gen::<f64>() < mutation_rate {
-            let mutation_dist = Normal::new(0.0, 0.05).expect("normal distribution parameters");
-            gene += mutation_dist.sample(rng);
+            gene += rng.sample::<f64, _>(StandardNormal) * 0.05;
         }
 
         gene.clamp(min, max)
-    }
-
-    pub fn get_fitness_score(&self) -> f64 {
-        let speed_score = self.speed * 0.2;
-        let sense_score = (self.sense_range / 100.0) * 0.15;
-        let efficiency_score = self.energy_efficiency * 0.2;
-        let size_score = (1.0 / self.size) * 0.1;
-        let reproduction_score = (1.0 / self.reproduction_threshold) * 50.0 * 0.1;
-        let predator_bonus = if self.is_predator > 0.5 { 0.5 } else { 0.0 };
-        let hunting_score = self.hunting_speed * 0.1;
-        let attack_score = self.attack_power * 0.1;
-        let defense_score = self.defense * 0.1;
-        let intelligence_score = self.intelligence * 0.1;
-        let stamina_score = self.stamina * 0.1;
-
-        speed_score
-            + sense_score
-            + efficiency_score
-            + size_score
-            + reproduction_score
-            + predator_bonus
-            + hunting_score
-            + attack_score
-            + defense_score
-            + intelligence_score
-            + stamina_score
     }
 }

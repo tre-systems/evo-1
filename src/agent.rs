@@ -1,6 +1,7 @@
 use crate::genes::Genes;
 use serde::{Deserialize, Serialize};
 
+/// Snapshot DTO exposed to rendering and external API callers.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Agent {
     pub x: f64,

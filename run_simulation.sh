@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 # BattleO Headless Simulation Runner
 # =================================
@@ -39,21 +40,14 @@ echo "  Max agents: ${MAX_AGENTS}"
 echo "  Max resources: ${MAX_RESOURCES}"
 echo ""
 
-# Build the simulation
-echo "Building simulation..."
-cargo build --bin headless --release
-
-if [ $? -ne 0 ]; then
-    echo "❌ Build failed!"
-    exit 1
-fi
-
-echo "✅ Build successful!"
-echo ""
-
-# Run the simulation
 echo "Starting simulation..."
-./target/release/headless "$DURATION_MINUTES" "$SPEED_MULTIPLIER" "$INITIAL_AGENTS" "$INITIAL_RESOURCES" "$MAX_AGENTS" "$MAX_RESOURCES"
+cargo run --release --locked --bin headless -- \
+    "$DURATION_MINUTES" \
+    "$SPEED_MULTIPLIER" \
+    "$INITIAL_AGENTS" \
+    "$INITIAL_RESOURCES" \
+    "$MAX_AGENTS" \
+    "$MAX_RESOURCES"
 
 echo ""
 echo "=== Simulation Complete ==="

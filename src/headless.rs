@@ -113,8 +113,7 @@ impl HeadlessSimulation {
 
     pub fn run(&mut self) -> SimulationDiagnostics {
         let start_time = std::time::Instant::now();
-        let target_steps =
-            (self.config.duration_minutes * 60.0 * 60.0 * self.config.speed_multiplier) as usize;
+        let target_steps = self.target_steps();
 
         println!(
             "Starting headless simulation with {}x speed multiplier",
@@ -141,9 +140,8 @@ impl HeadlessSimulation {
                 );
             }
 
-            // Check for early termination
-            let stats = self.simulation.get_stats();
-            if stats.agent_count == 0 || stats.agent_count > self.config.max_agents {
+            let agent_count = self.simulation.agent_count();
+            if agent_count == 0 || agent_count > self.config.max_agents {
                 println!("Early termination at step {step_count}");
                 break;
             }
@@ -179,8 +177,9 @@ impl HeadlessSimulation {
         // Calculate reproduction/death stats
         self.diagnostics.total_reproductions = stats.total_birth_events;
         self.diagnostics.total_deaths = stats.total_death_events;
+        self.diagnostics.stability_score = self.calculate_stability_score(stats.agent_count);
+        self.diagnostics.is_stable = self.diagnostics.stability_score >= 0.6;
 
-        // Calculate quality score
         self.diagnostics.simulation_quality_score = self.calculate_quality_score();
     }
 
@@ -188,10 +187,8 @@ impl HeadlessSimulation {
         let mut score = 0.0;
         let stats = &self.diagnostics.final_stats;
 
-        // Duration completion (20%)
-        let duration_ratio =
-            self.diagnostics.duration_seconds / (self.config.duration_minutes * 60.0);
-        score += duration_ratio * 0.2;
+        let completion_ratio = self.diagnostics.total_steps as f64 / self.target_steps() as f64;
+        score += completion_ratio.min(1.0) * 0.2;
 
         // Population health (25%)
         let final_agents = stats.agent_count;
@@ -227,6 +224,20 @@ impl HeadlessSimulation {
         score.clamp(0.0, 1.0)
     }
 
+    fn calculate_stability_score(&self, final_agents: usize) -> f64 {
+        if final_agents == 0 || self.config.initial_agents == 0 {
+            return 0.0;
+        }
+
+        let ratio = final_agents as f64 / self.config.initial_agents as f64;
+        (1.0 - (ratio - 1.0).abs() / 2.0).clamp(0.0, 1.0)
+    }
+
+    fn target_steps(&self) -> usize {
+        ((self.config.duration_minutes * 60.0 * 60.0 * self.config.speed_multiplier) as usize)
+            .max(1)
+    }
+
     pub fn get_current_stats(&self) -> SimulationStats {
         self.simulation.get_stats()
     }
@@ -254,6 +265,8 @@ impl HeadlessSimulation {
             "Quality score: {:.3}",
             self.diagnostics.simulation_quality_score
         );
+        println!("Stable run: {}", self.diagnostics.is_stable);
+        println!("Stability score: {:.3}", self.diagnostics.stability_score);
         println!(
             "Extinction occurred: {}",
             self.diagnostics.extinction_occurred

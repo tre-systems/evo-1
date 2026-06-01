@@ -46,15 +46,6 @@ impl WebRenderer {
             None
         };
 
-        let use_webgl = gl.is_some();
-
-        // Log which rendering method is being used
-        if use_webgl {
-            web_sys::console::log_1(&"🎮 Using WebGL rendering".into());
-        } else {
-            web_sys::console::log_1(&"🎨 Using Canvas 2D rendering (WebGL not available)".into());
-        }
-
         let canvas_width = canvas.width() as f32;
         let canvas_height = canvas.height() as f32;
 
@@ -62,27 +53,43 @@ impl WebRenderer {
             canvas,
             ctx_2d,
             gl: None,
-            use_webgl,
+            use_webgl: gl.is_some(),
             program: None,
             vertex_buffer: None,
             canvas_width,
             canvas_height,
-            start_time: 0.0, // Will be set properly in render
+            start_time: 0.0,
         };
 
-        // Initialize WebGL shaders if WebGL is available
-        if use_webgl {
-            if let Some(gl) = &gl {
-                // Enable blending for glow effects
-                gl.enable(WebGlRenderingContext::BLEND);
-                gl.blend_func(
-                    WebGlRenderingContext::SRC_ALPHA,
-                    WebGlRenderingContext::ONE_MINUS_SRC_ALPHA,
-                );
+        if let Some(gl) = &gl {
+            gl.enable(WebGlRenderingContext::BLEND);
+            gl.blend_func(
+                WebGlRenderingContext::SRC_ALPHA,
+                WebGlRenderingContext::ONE_MINUS_SRC_ALPHA,
+            );
 
-                renderer.init_webgl_shaders(gl)?;
+            if let Err(error) = renderer.init_webgl_shaders(gl) {
+                web_sys::console::warn_1(
+                    &format!("WebGL setup failed, trying Canvas2D fallback: {:?}", error).into(),
+                );
+                renderer.ctx_2d = Some(
+                    renderer
+                        .canvas
+                        .get_context("2d")
+                        .map_err(|_| "Failed to get 2D context after WebGL setup failure")?
+                        .and_then(|context| context.dyn_into::<CanvasRenderingContext2d>().ok())
+                        .ok_or("Canvas2D fallback unavailable after WebGL setup failure")?,
+                );
+                renderer.use_webgl = false;
+            } else {
                 renderer.gl = Some(gl.clone());
             }
+        }
+
+        if renderer.use_webgl {
+            web_sys::console::log_1(&"Using WebGL rendering".into());
+        } else {
+            web_sys::console::log_1(&"Using Canvas2D rendering".into());
         }
 
         Ok(renderer)
@@ -122,6 +129,7 @@ impl WebRenderer {
         "#,
         );
         gl.compile_shader(&vertex_shader);
+        Self::check_shader(gl, &vertex_shader, "vertex")?;
 
         // Fragment shader
         let fragment_shader = gl
@@ -191,12 +199,14 @@ impl WebRenderer {
         "#,
         );
         gl.compile_shader(&fragment_shader);
+        Self::check_shader(gl, &fragment_shader, "fragment")?;
 
         // Create program
         let program = gl.create_program().ok_or("Failed to create program")?;
         gl.attach_shader(&program, &vertex_shader);
         gl.attach_shader(&program, &fragment_shader);
         gl.link_program(&program);
+        Self::check_program(gl, &program)?;
 
         // Create vertex buffer for circle
         let vertex_buffer = gl.create_buffer().ok_or("Failed to create buffer")?;
@@ -231,6 +241,44 @@ impl WebRenderer {
         Ok(())
     }
 
+    fn check_shader(
+        gl: &WebGlRenderingContext,
+        shader: &web_sys::WebGlShader,
+        label: &str,
+    ) -> Result<(), JsValue> {
+        if gl
+            .get_shader_parameter(shader, WebGlRenderingContext::COMPILE_STATUS)
+            .as_bool()
+            .unwrap_or(false)
+        {
+            Ok(())
+        } else {
+            Err(format!(
+                "{label} shader compile failed: {}",
+                gl.get_shader_info_log(shader)
+                    .unwrap_or_else(|| "unknown error".to_string())
+            )
+            .into())
+        }
+    }
+
+    fn check_program(gl: &WebGlRenderingContext, program: &WebGlProgram) -> Result<(), JsValue> {
+        if gl
+            .get_program_parameter(program, WebGlRenderingContext::LINK_STATUS)
+            .as_bool()
+            .unwrap_or(false)
+        {
+            Ok(())
+        } else {
+            Err(format!(
+                "WebGL program link failed: {}",
+                gl.get_program_info_log(program)
+                    .unwrap_or_else(|| "unknown error".to_string())
+            )
+            .into())
+        }
+    }
+
     fn render_webgl(&mut self, simulation: &Simulation) {
         if let Some(gl) = &self.gl {
             // Update time (simplified for now)
@@ -242,7 +290,14 @@ impl WebRenderer {
 
             let time = current_time - self.start_time;
 
-            // Clear the canvas with a more organic, cell-friendly background
+            self.canvas_width = self.canvas.width() as f32;
+            self.canvas_height = self.canvas.height() as f32;
+            gl.viewport(
+                0,
+                0,
+                self.canvas.width() as i32,
+                self.canvas.height() as i32,
+            );
             gl.clear_color(0.02, 0.03, 0.08, 1.0);
             gl.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
 
@@ -277,14 +332,12 @@ impl WebRenderer {
             let agents = simulation.get_agents();
             let resources = simulation.get_resources();
 
-            // Render agents
-            for agent in &agents {
-                self.render_agent_canvas2d(ctx, agent);
-            }
-
-            // Render resources
             for resource in &resources {
                 self.render_resource_canvas2d(ctx, resource);
+            }
+
+            for agent in &agents {
+                self.render_agent_canvas2d(ctx, agent);
             }
         }
     }
@@ -445,8 +498,7 @@ impl WebRenderer {
             lightness + 10.0
         ));
         ctx.begin_path();
-        ctx.arc(x, y, size, 0.0, 2.0 * std::f64::consts::PI)
-            .unwrap();
+        let _ = ctx.arc(x, y, size, 0.0, 2.0 * std::f64::consts::PI);
         ctx.fill();
 
         // Draw cell wall (middle ring)
@@ -457,8 +509,7 @@ impl WebRenderer {
             lightness + 5.0
         ));
         ctx.begin_path();
-        ctx.arc(x, y, size * 0.85, 0.0, 2.0 * std::f64::consts::PI)
-            .unwrap();
+        let _ = ctx.arc(x, y, size * 0.85, 0.0, 2.0 * std::f64::consts::PI);
         ctx.fill();
 
         // Draw cytoplasm (inner area)
@@ -467,8 +518,7 @@ impl WebRenderer {
             hue, saturation, lightness
         ));
         ctx.begin_path();
-        ctx.arc(x, y, size * 0.6, 0.0, 2.0 * std::f64::consts::PI)
-            .unwrap();
+        let _ = ctx.arc(x, y, size * 0.6, 0.0, 2.0 * std::f64::consts::PI);
         ctx.fill();
 
         // Draw nucleus (core)
@@ -479,8 +529,7 @@ impl WebRenderer {
             lightness - 10.0
         ));
         ctx.begin_path();
-        ctx.arc(x, y, size * 0.25, 0.0, 2.0 * std::f64::consts::PI)
-            .unwrap();
+        let _ = ctx.arc(x, y, size * 0.25, 0.0, 2.0 * std::f64::consts::PI);
         ctx.fill();
 
         // Draw membrane border
@@ -515,24 +564,21 @@ impl WebRenderer {
         let opacity = 0.4 * depletion_factor.max(0.1);
         ctx.set_fill_style_str(&format!("hsla({}, 70%, 60%, {})", hue, opacity));
         ctx.begin_path();
-        ctx.arc(x, y, size, 0.0, 2.0 * std::f64::consts::PI)
-            .unwrap();
+        let _ = ctx.arc(x, y, size, 0.0, 2.0 * std::f64::consts::PI);
         ctx.fill();
 
         // Inner content
         let inner_opacity = 0.6 * depletion_factor.max(0.1);
         ctx.set_fill_style_str(&format!("hsla({}, 70%, 50%, {})", hue, inner_opacity));
         ctx.begin_path();
-        ctx.arc(x, y, size * 0.7, 0.0, 2.0 * std::f64::consts::PI)
-            .unwrap();
+        let _ = ctx.arc(x, y, size * 0.7, 0.0, 2.0 * std::f64::consts::PI);
         ctx.fill();
 
         // Core
         let core_opacity = 0.8 * depletion_factor.max(0.1);
         ctx.set_fill_style_str(&format!("hsla({}, 70%, 40%, {})", hue, core_opacity));
         ctx.begin_path();
-        ctx.arc(x, y, size * 0.4, 0.0, 2.0 * std::f64::consts::PI)
-            .unwrap();
+        let _ = ctx.arc(x, y, size * 0.4, 0.0, 2.0 * std::f64::consts::PI);
         ctx.fill();
 
         // Membrane border

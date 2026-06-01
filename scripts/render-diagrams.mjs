@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { basename, dirname, join, resolve } from 'node:path';
 
-const repoRoot = process.cwd();
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(scriptDir, '..');
 const diagramDir = join(repoRoot, 'docs', 'diagrams');
 
 const probe = spawnSync('dot', ['-V'], { stdio: 'ignore' });

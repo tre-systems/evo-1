@@ -98,7 +98,6 @@ pub struct SimulationConfig {
     pub max_resources: usize,
     pub initial_agents: usize,
     pub initial_resources: usize,
-    pub resource_spawn_rate: f64,
 }
 
 impl Default for SimulationConfig {
@@ -110,7 +109,6 @@ impl Default for SimulationConfig {
             max_resources: 2000,
             initial_agents: 500,
             initial_resources: 500,
-            resource_spawn_rate: 1.0, // Reserved for automatic resource spawning
         }
     }
 }
@@ -124,7 +122,6 @@ pub struct Simulation {
     config: SimulationConfig,
     runtime_capabilities: RuntimeCapabilities,
     time: f64,
-    resource_spawn_timer: f64,
 }
 
 impl Default for Simulation {
@@ -150,7 +147,6 @@ impl Simulation {
             config,
             runtime_capabilities: RuntimeCapabilities::default(),
             time: 0.0,
-            resource_spawn_timer: 0.0,
         }
     }
 
@@ -176,14 +172,12 @@ impl Simulation {
             config,
             runtime_capabilities,
             time: 0.0,
-            resource_spawn_timer: 0.0,
         }
     }
 
     pub fn update(&mut self) {
-        let delta_time = 10.0 / 60.0; // 10x faster simulation
+        let delta_time = 10.0 / 60.0;
         self.time += delta_time;
-        self.resource_spawn_timer += delta_time;
         self.ecs_world.begin_frame();
 
         // Update spatial grid for efficient neighbor lookups
@@ -206,16 +200,7 @@ impl Simulation {
         self.ecs_world.handle_death();
         self.ecs_world.handle_reproduction();
 
-        // Handle resource depletion
         self.ecs_world.handle_resource_depletion();
-
-        // Disable automatic resource spawning - let resources be finite
-        // if self.resource_spawn_timer >= 0.1 / self.config.resource_spawn_rate {
-        //     if self.ecs_world.get_resource_count() < self.config.max_resources {
-        //         self.ecs_world.spawn_resource();
-        //     }
-        //     self.resource_spawn_timer = 0.0;
-        // }
     }
 
     fn update_resources_parallel(&mut self, delta_time: f64) {
@@ -317,7 +302,6 @@ impl Simulation {
         self.ecs_world
             .reset_with_population(self.config.initial_agents, self.config.initial_resources);
         self.time = 0.0;
-        self.resource_spawn_timer = 0.0;
     }
 
     pub fn set_runtime_capabilities(&mut self, runtime_capabilities: RuntimeCapabilities) {
@@ -333,6 +317,7 @@ impl Simulation {
         let resource_count = self.ecs_world.get_resource_count();
 
         if agent_count == 0 {
+            let resources_being_consumed = self.ecs_world.resources_consumed_this_frame();
             return SimulationStats {
                 agent_count: 0,
                 resource_count,
@@ -349,7 +334,7 @@ impl Simulation {
                 // Event and resource diagnostics
                 total_resource_energy: 0.0,
                 average_resource_energy: 0.0,
-                resources_being_consumed: 0,
+                resources_being_consumed,
                 consumption_events_this_frame: self.ecs_world.consumption_events_this_frame,
                 total_consumption_events: self.ecs_world.total_consumption_events,
                 birth_events_this_frame: self.ecs_world.birth_events_this_frame,
@@ -430,6 +415,7 @@ impl Simulation {
                 state.target_x.is_some() || state.target_y.is_some()
             })
             .count();
+        let resources_being_consumed = self.ecs_world.resources_consumed_this_frame();
 
         SimulationStats {
             agent_count,
@@ -447,7 +433,7 @@ impl Simulation {
             // Event and resource diagnostics
             total_resource_energy,
             average_resource_energy,
-            resources_being_consumed: 0, // Will be set by ECS world
+            resources_being_consumed,
             consumption_events_this_frame: self.ecs_world.consumption_events_this_frame,
             total_consumption_events: self.ecs_world.total_consumption_events,
             birth_events_this_frame: self.ecs_world.birth_events_this_frame,
@@ -460,8 +446,15 @@ impl Simulation {
         }
     }
 
+    pub fn agent_count(&self) -> usize {
+        self.ecs_world.get_agent_count()
+    }
+
+    pub fn resource_count(&self) -> usize {
+        self.ecs_world.get_resource_count()
+    }
+
     pub fn get_agents(&self) -> Vec<Agent> {
-        // Convert ECS agents to legacy Agent format for compatibility
         self.ecs_world
             .get_agents()
             .into_iter()
@@ -499,7 +492,6 @@ impl Simulation {
     }
 
     pub fn get_resources(&self) -> Vec<Resource> {
-        // Convert ECS resources to legacy Resource format for compatibility
         self.ecs_world
             .get_resources()
             .into_iter()

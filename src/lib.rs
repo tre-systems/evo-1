@@ -60,7 +60,10 @@ impl BattleSimulation {
     }
 
     pub fn get_stats(&self) -> JsValue {
-        serde_wasm_bindgen::to_value(&self.simulation.get_stats()).unwrap()
+        serde_wasm_bindgen::to_value(&self.simulation.get_stats()).unwrap_or_else(|error| {
+            web_sys::console::error_1(&format!("Failed to serialize stats: {error}").into());
+            JsValue::NULL
+        })
     }
 
     pub fn add_agent(&mut self, x: f64, y: f64) {
@@ -153,10 +156,13 @@ impl ParallelProcessor {
                 );
             }) as Box<dyn FnMut(JsValue)>);
 
-            // Store the closure so it doesn't get dropped
             self.closure = Some(closure);
             self.initialized = true;
-            init_thread_pool(self.worker_count).then(&self.closure.as_ref().unwrap())
+            if let Some(callback) = self.closure.as_ref() {
+                init_thread_pool(self.worker_count).then(callback)
+            } else {
+                js_sys::Promise::reject(&"Thread pool callback was not retained".into())
+            }
         }
 
         #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
@@ -208,31 +214,23 @@ pub fn init_panic_hook() {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub struct HeadlessSimulation {
-    simulation: simulation::Simulation,
-    config: headless::HeadlessConfig,
+    inner: headless::HeadlessSimulation,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl HeadlessSimulation {
     pub fn new(config: headless::HeadlessConfig) -> Self {
-        let simulation = simulation::Simulation::new_with_config(simulation::SimulationConfig {
-            initial_agents: config.initial_agents,
-            initial_resources: config.initial_resources,
-            max_agents: config.max_agents,
-            max_resources: config.max_resources,
-            ..simulation::SimulationConfig::default()
-        });
-
-        Self { simulation, config }
+        Self {
+            inner: headless::HeadlessSimulation::new(config),
+        }
     }
 
     pub fn run(&mut self) -> headless::SimulationDiagnostics {
-        let mut headless_sim = headless::HeadlessSimulation::new(self.config.clone());
-        headless_sim.run()
+        self.inner.run()
     }
 
     pub fn get_current_stats(&self) -> simulation::SimulationStats {
-        self.simulation.get_stats()
+        self.inner.get_current_stats()
     }
 }
 

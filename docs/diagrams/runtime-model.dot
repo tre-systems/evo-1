@@ -86,7 +86,6 @@ digraph BattleORuntimeModel {
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">config</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">SimulationConfig</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">runtime_capabilities</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">RuntimeCapabilities</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">time</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">frame clock</FONT></TD></TR>
-        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">resource_spawn_timer</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">reserved</FONT></TD></TR>
       </TABLE>
     >];
 
@@ -97,7 +96,7 @@ digraph BattleORuntimeModel {
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">canvas bounds</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">width / height</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">max counts</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">agent / resource caps</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">spatial_grid</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">SpatialGrid</FONT></TD></TR>
-        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">consumption counters</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">diagnostic state</FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">event counters</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">diagnostic state</FONT></TD></TR>
         <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="14">frame_events</FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="13" COLOR="#5b6b80">consumed / killed / died / born</FONT></TD></TR>
       </TABLE>
     >];

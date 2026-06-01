@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 # BattleO Simulation Scenarios Runner
 # ===================================
@@ -48,19 +49,14 @@ run_scenario() {
     echo "Max: ${max_agents} agents, ${max_resources} resources"
     echo ""
     
-    # Build if needed
-    if [ ! -f "./target/release/headless" ]; then
-        echo "Building simulation..."
-        cargo build --bin headless --release
-        if [ $? -ne 0 ]; then
-            echo "❌ Build failed!"
-            return 1
-        fi
-    fi
-    
-    # Run simulation
     echo "Starting simulation..."
-    ./target/release/headless "$duration" "$speed" "$init_agents" "$init_resources" "$max_agents" "$max_resources"
+    cargo run --release --locked --bin headless -- \
+        "$duration" \
+        "$speed" \
+        "$init_agents" \
+        "$init_resources" \
+        "$max_agents" \
+        "$max_resources"
     
     echo ""
     echo "✅ Scenario '$scenario_name' completed!"

@@ -46,7 +46,6 @@ fn main() {
     println!("  Max resources: {}", config.max_resources);
     println!();
 
-    // Create and run simulation
     let start_time = Instant::now();
     let mut simulation = HeadlessSimulation::new(config.clone());
 
@@ -54,7 +53,6 @@ fn main() {
     let diagnostics = simulation.run();
     let total_time = start_time.elapsed();
 
-    // Print results
     println!("\n=== Simulation Results ===");
     println!("Total runtime: {:.2}s", total_time.as_secs_f64());
     println!("Simulation time: {:.2}s", diagnostics.duration_seconds);
@@ -78,6 +76,8 @@ fn main() {
 
     println!("\n=== Simulation Quality ===");
     println!("Quality score: {:.3}", diagnostics.simulation_quality_score);
+    println!("Stable run: {}", diagnostics.is_stable);
+    println!("Stability score: {:.3}", diagnostics.stability_score);
     println!("Extinction occurred: {}", diagnostics.extinction_occurred);
     println!("Population explosion: {}", diagnostics.population_explosion);
     println!(
@@ -109,7 +109,6 @@ fn main() {
         diagnostics.final_stats.average_fitness
     );
 
-    // Quality assessment
     println!("\n=== Quality Assessment ===");
     if diagnostics.simulation_quality_score > 0.8 {
         println!("✅ Excellent simulation quality!");
@@ -140,8 +139,8 @@ fn main() {
     println!("\n=== Summary ===");
     println!("BattleO headless simulation completed successfully!");
     println!(
-        "The simulation ran {}x faster than real-time",
-        config.speed_multiplier
+        "The simulation ran {:.1}x faster than real-time",
+        diagnostics.steps_per_second / 60.0
     );
     println!(
         "Processed {} simulation steps in {:.2} seconds",
