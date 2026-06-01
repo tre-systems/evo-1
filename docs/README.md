@@ -4,7 +4,7 @@ Essential documentation for the BattleO evolutionary simulation framework.
 
 ## Core Documentation
 
-- **[Implementation Guide](implementation.md)** - Parallel processing, ECS architecture, and WebGL rendering
+- **[Implementation Guide](implementation.md)** - Architecture pattern catalog, parallel processing, ECS architecture, and WebGL rendering
 - **[API Reference](api-reference.md)** - Complete API documentation
 - **[Maintenance Notes](maintenance.md)** - Checks, browser smoke tests, live-site status, and branch cleanup guidance
 

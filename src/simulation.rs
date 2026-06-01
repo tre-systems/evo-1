@@ -177,12 +177,8 @@ impl Simulation {
         // Handle resource consumption (agents eating resources)
         self.ecs_world.handle_consumption();
 
-        // Update agents (can be parallelized)
-        if is_rayon_available() {
-            self.update_agents_parallel(delta_time);
-        } else {
-            self.update_agents_sequential(delta_time);
-        }
+        // Update agents through the spatial-grid optimized ECS pass.
+        self.update_agents_spatial(delta_time);
 
         // Handle death and reproduction
         self.ecs_world.handle_death();
@@ -248,7 +244,7 @@ impl Simulation {
         }
     }
 
-    fn update_agents_parallel(&mut self, delta_time: f64) {
+    fn update_agents_spatial(&mut self, delta_time: f64) {
         // Use the existing ECS world's optimized update method
         // This uses the spatial grid for efficient neighbor lookups
         let agent_entities: Vec<_> = self
@@ -277,56 +273,6 @@ impl Simulation {
             self.ecs_world.update_single_agent_optimized(
                 entity,
                 delta_time,
-                self.config.width,
-                self.config.height,
-            );
-        }
-    }
-
-    fn update_agents_sequential(&mut self, delta_time: f64) {
-        // Collect all resources for efficient lookup
-        let resources: Vec<_> = self
-            .ecs_world
-            .world
-            .query::<(&crate::ecs::Position, &crate::ecs::Resource)>()
-            .iter()
-            .filter(|(entity, _)| {
-                self.ecs_world
-                    .world
-                    .get::<&crate::ecs::ResourceTag>(*entity)
-                    .is_ok()
-            })
-            .map(|(_, (pos, res))| (pos.x, pos.y, res.clone()))
-            .collect();
-
-        // Get all agent entities that need updating
-        let agent_entities: Vec<_> = self
-            .ecs_world
-            .world
-            .query::<(
-                &crate::ecs::Position,
-                &crate::ecs::Velocity,
-                &crate::ecs::Energy,
-                &crate::ecs::Age,
-                &crate::ecs::AgentState,
-                &crate::ecs::Genes,
-            )>()
-            .iter()
-            .filter(|(entity, _)| {
-                self.ecs_world
-                    .world
-                    .get::<&crate::ecs::AgentTag>(*entity)
-                    .is_ok()
-            })
-            .map(|(entity, _)| entity)
-            .collect();
-
-        // Update agents sequentially
-        for entity in agent_entities {
-            self.ecs_world.update_single_agent(
-                entity,
-                delta_time,
-                &resources,
                 self.config.width,
                 self.config.height,
             );
