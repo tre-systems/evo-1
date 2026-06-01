@@ -91,7 +91,7 @@ Components should stay data-oriented. Behavior belongs in ECS system functions, 
 3. Rebuild the spatial grid.
 4. Update resources through the sequential or parallel resource path.
 5. Resolve resource consumption and predator/prey interactions.
-6. Update agents with spatial targeting and personal-space avoidance.
+6. Update agents with a spatial decision snapshot for food, threats, prey, mates, targets, movement, and energy costs.
 7. Despawn dead agents and record deaths.
 8. Reproduce eligible agents and record births.
 9. Remove depleted resources.
@@ -115,18 +115,35 @@ Use the same pattern for any new system that needs multiple reads before mutatio
 
 The spatial grid is rebuilt once at the start of the public frame pipeline and is used for:
 
-- nearby resources for agent targeting,
+- nearby resources for feeding and food targeting,
+- nearby agents for threat detection, prey choice, and mate choice,
 - nearby agents for personal-space avoidance,
 - resource consumption checks,
 - predator/prey checks.
 
 New proximity behavior should use `SpatialGrid` instead of broad all-pairs scans. If a new behavior needs positions that change during the same frame, document where the grid is refreshed or why stale-within-frame positions are acceptable.
 
+### Behavior Decision
+
+`EcsWorld::update_single_agent_optimized` uses the collect-then-mutate pattern inside each agent update: it reads nearby resources and agents into small immutable snapshots, chooses one `AgentDecision`, then mutates the current agent's state, target, velocity, age, and energy.
+
+Decision priority is:
+
+1. Flee from stronger nearby threats, especially when energy is low.
+2. Hunt or fight weaker prey when predator drive or aggression is high enough.
+3. Seek a nearby mate when the same eligibility rule used by reproduction is satisfied.
+4. Feed from nearby resources or hunt toward the best available resource.
+5. Seek by wandering when no stronger signal is available.
+
+The public state names are current behavior states, not historical transitions: `Seeking`, `Hunting`, `Feeding`, `Fleeing`, `Fighting`, and `Reproducing`. Predator/prey telemetry uses `PREDATOR_TRAIT_THRESHOLD` from [src/ecs.rs](../src/ecs.rs) so the UI, headless output, and tests share one classification rule.
+
 ### Frame Event Ledger
 
 `EcsWorld::frame_events` records per-frame facts such as consumed resources, agent kills, deaths, and births. Aggregated counters feed `SimulationStats` and `SimulationDiagnostics`.
 
 When adding user-visible lifecycle behavior, add the event at the mutation site rather than recomputing it later from final state.
+
+Snapshot telemetry such as state distribution, predator/prey mix, target counts, and reproduction candidates is derived from committed ECS state in `Simulation::get_stats`; it does not belong in `FrameEvent` unless it represents a discrete lifecycle fact.
 
 ### Snapshot DTO
 
@@ -179,7 +196,7 @@ These are the current architecture pressure points to address before adding larg
 - Split the largest ECS systems into focused system modules once behavior changes require it. Today they are still understandable in one file, but `EcsWorld` is the main growth risk.
 - Replace full agent/resource DTO cloning with compact render-specific snapshots if browser rendering or API serialization becomes a bottleneck.
 - Collapse the resource `Size` duplication. Resource entities currently carry both `Resource::size` and a `Size` component, so future resource-rendering changes should pick one source of truth.
-- Split richer agent decision-making into explicit systems as `Fleeing`, `Fighting`, mate seeking, and strategy policy behavior become real.
+- Extract decision scoring from `EcsWorld` into focused system helpers if behavior policy work grows beyond the current food, threat, prey, and mate decisions.
 
 ## Documentation Boundary
 

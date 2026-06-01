@@ -93,10 +93,10 @@ digraph BattleOSystemOverview {
     seeded_scenarios [label=<<B>Seeded scenarios</B><BR/><FONT POINT-SIZE="15">reproducible ecology probes</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
     capabilities [label=<<B>RuntimeCapabilities</B><BR/><FONT POINT-SIZE="15">explicit parallel resource flag</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
     world [label=<<B>EcsWorld</B><BR/><FONT POINT-SIZE="15">hecs::World + systems</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    components [label=<<B>ECS components</B><BR/><FONT POINT-SIZE="15">Position, Energy, Genes, tags</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    components [label=<<B>ECS components</B><BR/><FONT POINT-SIZE="15">Position, Energy, Genes, AgentState, tags</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
     spatial_grid [label=<<B>SpatialGrid</B><BR/><FONT POINT-SIZE="15">nearby entity lookup</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
     events [label=<<B>FrameEvent ledger</B><BR/><FONT POINT-SIZE="15">consumed, killed, died, born</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    frame_pipeline [label=<<B>Ordered frame pipeline</B><BR/><FONT POINT-SIZE="15">resources, consumption, agents, lifecycle</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    frame_pipeline [label=<<B>Ordered frame pipeline</B><BR/><FONT POINT-SIZE="15">resources, decisions, lifecycle</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
 
     simulation -> world [label="owns"];
     simulation -> seeded_scenarios [label="configures"];
@@ -126,7 +126,7 @@ digraph BattleOSystemOverview {
     ];
 
     renderer [label=<<B>WebRenderer</B><BR/><FONT POINT-SIZE="15">WebGL first, Canvas2D fallback</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
-    stats [label=<<B>SimulationStats</B><BR/><FONT POINT-SIZE="15">browser and API snapshot</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
+    stats [label=<<B>SimulationStats</B><BR/><FONT POINT-SIZE="15">counts, behavior, events</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
     diagnostics [label=<<B>SimulationDiagnostics</B><BR/><FONT POINT-SIZE="15">headless experiment summary</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
     dto [label=<<B>Snapshot DTOs</B><BR/><FONT POINT-SIZE="15">Agent and Resource read models</FONT>>, fillcolor="#f5f3ff:#ffffff", color="#7c3aed"];
   }

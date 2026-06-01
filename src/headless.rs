@@ -262,6 +262,26 @@ impl HeadlessSimulation {
             "Total energy: {:.1}",
             self.diagnostics.final_stats.total_energy
         );
+        println!("Total kills: {}", self.diagnostics.final_stats.total_kills);
+        println!(
+            "Predators / prey: {} / {}",
+            self.diagnostics.final_stats.predator_agents, self.diagnostics.final_stats.prey_agents
+        );
+
+        println!("\n=== Agent Behavior ===");
+        println!("Seeking: {}", self.diagnostics.final_stats.seeking_agents);
+        println!("Hunting: {}", self.diagnostics.final_stats.hunting_agents);
+        println!("Feeding: {}", self.diagnostics.final_stats.feeding_agents);
+        println!("Fleeing: {}", self.diagnostics.final_stats.fleeing_agents);
+        println!("Fighting: {}", self.diagnostics.final_stats.fighting_agents);
+        println!(
+            "Reproducing: {}",
+            self.diagnostics.final_stats.reproducing_agents
+        );
+        println!(
+            "Ready to mate: {}",
+            self.diagnostics.final_stats.reproduction_candidates
+        );
 
         println!("\n=== Simulation Quality ===");
         println!(

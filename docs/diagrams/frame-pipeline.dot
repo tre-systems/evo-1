@@ -95,8 +95,8 @@ digraph BattleOFramePipeline {
     ];
 
     collect_agents [label=<<B>Collect agent IDs</B><BR/><FONT POINT-SIZE="15">marker-tag filtered entities</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    update_agents [label=<<B>update_single_agent_optimized</B><BR/><FONT POINT-SIZE="15">movement, targets, energy</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    nearby [label=<<B>Nearby resources</B><BR/><FONT POINT-SIZE="15">SpatialGrid query</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    update_agents [label=<<B>update_single_agent_optimized</B><BR/><FONT POINT-SIZE="15">decision states, movement, energy</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    nearby [label=<<B>Nearby snapshots</B><BR/><FONT POINT-SIZE="15">food, threats, prey, mates</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
 
     collect_agents -> update_agents -> nearby [style=dashed, label="lookup", color="#6b7280", fontcolor="#6b7280"];
   }

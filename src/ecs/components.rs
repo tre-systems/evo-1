@@ -57,7 +57,7 @@ pub struct AgentState {
     pub generation: u32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub enum AgentStateEnum {
     Seeking,
     Hunting,

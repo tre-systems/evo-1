@@ -87,6 +87,15 @@ pub struct SimulationStats {
     pub max_generation: u32,
     pub total_kills: u32,
     pub average_fitness: f64,
+    pub seeking_agents: usize,
+    pub hunting_agents: usize,
+    pub feeding_agents: usize,
+    pub fleeing_agents: usize,
+    pub fighting_agents: usize,
+    pub reproducing_agents: usize,
+    pub predator_agents: usize,
+    pub prey_agents: usize,
+    pub reproduction_candidates: usize,
     pub total_resource_energy: f64,
     pub average_resource_energy: f64,
     pub resources_being_consumed: usize,
@@ -101,6 +110,8 @@ pub struct SimulationStats {
     pub agents_with_targets: usize,
 }
 ```
+
+The behavior fields are committed-frame snapshot counts derived from live agent state, not transition counters. `predator_agents` uses the current `is_predator >= 0.5` trait threshold; `prey_agents` is the remaining live population. `reproduction_candidates` uses the same energy, age, and cooldown eligibility rule as the reproduction system before mate pairing and probability checks.
 
 Event counters come from the per-frame `FrameEvent` ledger in `EcsWorld`.
 

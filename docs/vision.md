@@ -48,12 +48,14 @@ Done in the first vision iteration:
 
 Goal: make `Seeking`, `Hunting`, `Feeding`, `Fleeing`, `Fighting`, and `Reproducing` real strategic states.
 
-Next work:
+Done in the second vision iteration:
 
-- Add explicit threat detection and fleeing from stronger nearby agents.
-- Add mate seeking when energy and age support reproduction.
-- Make aggression influence attack choice and risk tolerance.
-- Record state-transition counts in `SimulationStats`.
+- Agents build a spatial snapshot of nearby resources and agents before mutating their own state.
+- Stronger nearby threats can trigger `Fleeing`.
+- Predator drive and aggression influence prey targeting, combat risk, and `Fighting`.
+- Eligible agents seek nearby mates before the reproduction system pairs and spawns offspring.
+- `SimulationStats`, headless output, and the browser UI expose current state distribution, predator/prey mix, reproduction candidates, births, and kills.
+- Seeded regression coverage now proves survival, reproduction, later generations, and nonzero combat pressure.
 
 ### 3. Heritable Strategy Genome
 

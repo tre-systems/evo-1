@@ -25,7 +25,7 @@ impl Genes {
             mutation_rate: rng.gen_range(0.02..0.08),
             aggression: rng.gen_range(0.2..0.8),
             color_hue: rng.gen_range(0.0..360.0),
-            is_predator: rng.gen_range(0.0..0.3),
+            is_predator: rng.gen_range(0.0..0.8),
             hunting_speed: rng.gen_range(1.0..2.0),
             attack_power: rng.gen_range(0.5..1.5),
             defense: rng.gen_range(0.5..1.5),

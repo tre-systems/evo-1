@@ -79,6 +79,25 @@ fn main() {
     println!("Average age: {:.1}", diagnostics.final_stats.average_age);
     println!("Max generation: {}", diagnostics.final_stats.max_generation);
     println!("Total kills: {}", diagnostics.final_stats.total_kills);
+    println!(
+        "Predators / prey: {} / {}",
+        diagnostics.final_stats.predator_agents, diagnostics.final_stats.prey_agents
+    );
+
+    println!("\n=== Agent Behavior ===");
+    println!("Seeking: {}", diagnostics.final_stats.seeking_agents);
+    println!("Hunting: {}", diagnostics.final_stats.hunting_agents);
+    println!("Feeding: {}", diagnostics.final_stats.feeding_agents);
+    println!("Fleeing: {}", diagnostics.final_stats.fleeing_agents);
+    println!("Fighting: {}", diagnostics.final_stats.fighting_agents);
+    println!(
+        "Reproducing: {}",
+        diagnostics.final_stats.reproducing_agents
+    );
+    println!(
+        "Ready to mate: {}",
+        diagnostics.final_stats.reproduction_candidates
+    );
 
     println!("\n=== Simulation Quality ===");
     println!("Quality score: {:.3}", diagnostics.simulation_quality_score);

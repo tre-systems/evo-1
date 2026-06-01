@@ -42,6 +42,12 @@ For a reproducible ecology smoke test that should reach later generations:
 ./run_simulation.sh 0.01 20 50 100 150 150 7
 ```
 
+For a reproducible battle smoke test that should show nonzero combat pressure:
+
+```bash
+./run_scenarios.sh quick_test
+```
+
 ## Browser Smoke Test
 
 After building `pkg/`, run:
@@ -53,7 +59,7 @@ python3 server.py
 Then open `http://127.0.0.1:8000` and verify:
 
 - The page reports that the simulation is ready.
-- `Start Simulation` advances the stats.
+- `Start Simulation` advances the population, behavior-state, predator/prey, birth, and kill stats.
 - `Reset` returns the simulation to its configured initial population.
 - The browser console does not show initialization errors.
 

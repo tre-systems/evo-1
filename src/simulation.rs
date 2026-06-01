@@ -1,5 +1,5 @@
 use crate::agent::Agent;
-use crate::ecs::EcsWorld;
+use crate::ecs::{AgentStateEnum, EcsWorld, PREDATOR_TRAIT_THRESHOLD};
 use crate::resource::Resource;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -39,6 +39,15 @@ pub struct SimulationStats {
     pub max_generation: u32,
     pub total_kills: u32,
     pub average_fitness: f64,
+    pub seeking_agents: usize,
+    pub hunting_agents: usize,
+    pub feeding_agents: usize,
+    pub fleeing_agents: usize,
+    pub fighting_agents: usize,
+    pub reproducing_agents: usize,
+    pub predator_agents: usize,
+    pub prey_agents: usize,
+    pub reproduction_candidates: usize,
     // Event and resource diagnostics
     pub total_resource_energy: f64,
     pub average_resource_energy: f64,
@@ -69,6 +78,15 @@ impl Default for SimulationStats {
             max_generation: 0,
             total_kills: 0,
             average_fitness: 0.0,
+            seeking_agents: 0,
+            hunting_agents: 0,
+            feeding_agents: 0,
+            fleeing_agents: 0,
+            fighting_agents: 0,
+            reproducing_agents: 0,
+            predator_agents: 0,
+            prey_agents: 0,
+            reproduction_candidates: 0,
             // Event and resource diagnostics
             total_resource_energy: 0.0,
             average_resource_energy: 0.0,
@@ -340,6 +358,15 @@ impl Simulation {
                 max_generation: 0,
                 total_kills: self.ecs_world.total_kill_events as u32,
                 average_fitness: 0.0,
+                seeking_agents: 0,
+                hunting_agents: 0,
+                feeding_agents: 0,
+                fleeing_agents: 0,
+                fighting_agents: 0,
+                reproducing_agents: 0,
+                predator_agents: 0,
+                prey_agents: 0,
+                reproduction_candidates: 0,
                 // Event and resource diagnostics
                 total_resource_energy: 0.0,
                 average_resource_energy: 0.0,
@@ -404,6 +431,40 @@ impl Simulation {
             .map(|(_, _, energy, _, _, _, _)| energy.current / energy.max)
             .sum::<f64>()
             / agent_count as f64;
+        let mut seeking_agents = 0;
+        let mut hunting_agents = 0;
+        let mut feeding_agents = 0;
+        let mut fleeing_agents = 0;
+        let mut fighting_agents = 0;
+        let mut reproducing_agents = 0;
+        let mut predator_agents = 0;
+        let mut reproduction_candidates = 0;
+
+        for (_, _, energy, age, state, genes, _) in &agents {
+            match state.state {
+                AgentStateEnum::Seeking => seeking_agents += 1,
+                AgentStateEnum::Hunting => hunting_agents += 1,
+                AgentStateEnum::Feeding => feeding_agents += 1,
+                AgentStateEnum::Fleeing => fleeing_agents += 1,
+                AgentStateEnum::Fighting => fighting_agents += 1,
+                AgentStateEnum::Reproducing => reproducing_agents += 1,
+            }
+
+            if genes.is_predator >= PREDATOR_TRAIT_THRESHOLD {
+                predator_agents += 1;
+            }
+
+            if EcsWorld::is_reproduction_candidate_from_values(
+                energy.current,
+                energy.max,
+                age.value,
+                state.last_reproduction,
+                genes.reproduction_threshold,
+            ) {
+                reproduction_candidates += 1;
+            }
+        }
+        let prey_agents = agent_count.saturating_sub(predator_agents);
 
         // Get resource statistics
         let resources = self.ecs_world.get_resources();
@@ -439,6 +500,15 @@ impl Simulation {
             max_generation,
             total_kills,
             average_fitness,
+            seeking_agents,
+            hunting_agents,
+            feeding_agents,
+            fleeing_agents,
+            fighting_agents,
+            reproducing_agents,
+            predator_agents,
+            prey_agents,
+            reproduction_candidates,
             // Event and resource diagnostics
             total_resource_energy,
             average_resource_energy,

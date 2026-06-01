@@ -72,7 +72,7 @@
 
       .stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 15px;
         margin-bottom: 20px;
       }
@@ -168,6 +168,46 @@
           <div class="stat-value" id="maxGen">0</div>
         </div>
         <div class="stat-card">
+          <div class="stat-label">Kills</div>
+          <div class="stat-value" id="totalKills">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Births</div>
+          <div class="stat-value" id="totalBirths">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Predators</div>
+          <div class="stat-value" id="predatorAgents">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Prey</div>
+          <div class="stat-value" id="preyAgents">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Feeding</div>
+          <div class="stat-value" id="feedingAgents">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Hunting</div>
+          <div class="stat-value" id="huntingAgents">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Fleeing</div>
+          <div class="stat-value" id="fleeingAgents">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Fighting</div>
+          <div class="stat-value" id="fightingAgents">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Reproducing</div>
+          <div class="stat-value" id="reproducingAgents">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ready to Mate</div>
+          <div class="stat-value" id="reproductionCandidates">0</div>
+        </div>
+        <div class="stat-card">
           <div class="stat-label">FPS</div>
           <div class="stat-value" id="fps">0</div>
         </div>
@@ -200,16 +240,26 @@
       }
 
       function updateStats(stats) {
-        document.getElementById("agentCount").textContent = stats.agent_count;
-        document.getElementById("resourceCount").textContent =
-          stats.resource_count;
-        document.getElementById("totalEnergy").textContent = Math.round(
-          stats.total_energy
-        );
-        document.getElementById("avgAge").textContent = Math.round(
-          stats.average_age
-        );
-        document.getElementById("maxGen").textContent = stats.max_generation;
+        const setText = (id, value) => {
+          document.getElementById(id).textContent = value;
+        };
+        const count = (value) => value ?? 0;
+
+        setText("agentCount", count(stats.agent_count));
+        setText("resourceCount", count(stats.resource_count));
+        setText("totalEnergy", Math.round(count(stats.total_energy)));
+        setText("avgAge", Math.round(count(stats.average_age)));
+        setText("maxGen", count(stats.max_generation));
+        setText("totalKills", count(stats.total_kills));
+        setText("totalBirths", count(stats.total_birth_events));
+        setText("predatorAgents", count(stats.predator_agents));
+        setText("preyAgents", count(stats.prey_agents));
+        setText("feedingAgents", count(stats.feeding_agents));
+        setText("huntingAgents", count(stats.hunting_agents));
+        setText("fleeingAgents", count(stats.fleeing_agents));
+        setText("fightingAgents", count(stats.fighting_agents));
+        setText("reproducingAgents", count(stats.reproducing_agents));
+        setText("reproductionCandidates", count(stats.reproduction_candidates));
       }
 
       function updateFPS() {
