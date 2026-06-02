@@ -106,6 +106,16 @@ pub struct Resource {
 
 impl Resource {
     pub fn update(&mut self, delta_time: f64) {
+        self.update_with_growth_scale(delta_time, 1.0);
+    }
+
+    pub fn update_with_growth_scale(&mut self, delta_time: f64, growth_scale: f64) {
+        let growth_scale = if growth_scale.is_finite() {
+            growth_scale.clamp(0.25, 2.5)
+        } else {
+            1.0
+        };
+
         self.age += delta_time;
 
         if self.is_spawning {
@@ -118,7 +128,7 @@ impl Resource {
         }
 
         if !self.is_depleting {
-            let regeneration = self.regeneration_rate * self.max_energy * delta_time;
+            let regeneration = self.regeneration_rate * self.max_energy * delta_time * growth_scale;
             self.energy = (self.energy + regeneration).min(self.max_energy);
             self.target_energy = self.max_energy;
         }

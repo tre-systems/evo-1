@@ -22,6 +22,58 @@ impl RuntimeCapabilities {
 }
 
 // ============================================================================
+// ECOLOGY SETTINGS
+// ============================================================================
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct EcologySettings {
+    pub resource_growth_scale: f64,
+    pub reproduction_scale: f64,
+}
+
+impl Default for EcologySettings {
+    fn default() -> Self {
+        Self {
+            resource_growth_scale: 1.0,
+            reproduction_scale: 1.0,
+        }
+    }
+}
+
+impl EcologySettings {
+    pub fn new(resource_growth_scale: f64, reproduction_scale: f64) -> Self {
+        Self {
+            resource_growth_scale,
+            reproduction_scale,
+        }
+        .normalized()
+    }
+
+    pub fn normalized(self) -> Self {
+        Self {
+            resource_growth_scale: finite_or_default(
+                self.resource_growth_scale,
+                Self::default().resource_growth_scale,
+            )
+            .clamp(0.25, 2.5),
+            reproduction_scale: finite_or_default(
+                self.reproduction_scale,
+                Self::default().reproduction_scale,
+            )
+            .clamp(0.25, 2.5),
+        }
+    }
+}
+
+fn finite_or_default(value: f64, default: f64) -> f64 {
+    if value.is_finite() {
+        value
+    } else {
+        default
+    }
+}
+
+// ============================================================================
 // SIMULATION STATS
 // ============================================================================
 
@@ -118,6 +170,7 @@ pub struct SimulationConfig {
     pub initial_resources: usize,
     pub seed: Option<u64>,
     pub motion: MotionSettings,
+    pub ecology: EcologySettings,
 }
 
 impl Default for SimulationConfig {
@@ -131,6 +184,7 @@ impl Default for SimulationConfig {
             initial_resources: 500,
             seed: None,
             motion: MotionSettings::default(),
+            ecology: EcologySettings::default(),
         }
     }
 }
@@ -222,7 +276,8 @@ impl Simulation {
 
         // Handle death and reproduction
         self.ecs_world.handle_death();
-        self.ecs_world.handle_reproduction();
+        self.ecs_world
+            .handle_reproduction_with_scale(self.config.ecology.reproduction_scale);
 
         self.ecs_world.handle_resource_depletion();
         self.ecs_world
@@ -230,6 +285,8 @@ impl Simulation {
     }
 
     fn update_resources_parallel(&mut self, delta_time: f64) {
+        let resource_growth_scale = self.config.ecology.resource_growth_scale;
+
         // Collect all resource data for parallel processing
         let resource_data: Vec<_> = self
             .ecs_world
@@ -250,7 +307,7 @@ impl Simulation {
             .par_iter()
             .map(|(entity, resource)| {
                 let mut updated_resource = resource.clone();
-                updated_resource.update(delta_time);
+                updated_resource.update_with_growth_scale(delta_time, resource_growth_scale);
                 (*entity, updated_resource)
             })
             .collect();
@@ -268,12 +325,14 @@ impl Simulation {
     }
 
     fn update_resources_sequential(&mut self, delta_time: f64) {
+        let resource_growth_scale = self.config.ecology.resource_growth_scale;
+
         for (_, resource) in self
             .ecs_world
             .world
             .query_mut::<&mut crate::ecs::Resource>()
         {
-            resource.update(delta_time);
+            resource.update_with_growth_scale(delta_time, resource_growth_scale);
         }
     }
 
@@ -348,6 +407,14 @@ impl Simulation {
 
     pub fn motion_settings(&self) -> MotionSettings {
         self.config.motion
+    }
+
+    pub fn set_ecology_controls(&mut self, resource_growth_scale: f64, reproduction_scale: f64) {
+        self.config.ecology = EcologySettings::new(resource_growth_scale, reproduction_scale);
+    }
+
+    pub fn ecology_settings(&self) -> EcologySettings {
+        self.config.ecology
     }
 
     pub fn get_stats(&self) -> SimulationStats {

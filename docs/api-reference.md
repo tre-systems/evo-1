@@ -36,6 +36,8 @@ let stats = simulation.get_stats();
 - `runtime_capabilities(&self) -> RuntimeCapabilities`
 - `set_motion_controls(&mut self, smoothness: f64, speed_scale: f64, wander: f64)`
 - `motion_settings(&self) -> MotionSettings`
+- `set_ecology_controls(&mut self, resource_growth_scale: f64, reproduction_scale: f64)`
+- `ecology_settings(&self) -> EcologySettings`
 - `get_stats(&self) -> SimulationStats`
 - `agent_count(&self) -> usize`
 - `resource_count(&self) -> usize`
@@ -55,6 +57,7 @@ pub struct SimulationConfig {
     pub initial_resources: usize,
     pub seed: Option<u64>,
     pub motion: MotionSettings,
+    pub ecology: EcologySettings,
 }
 ```
 
@@ -73,7 +76,20 @@ pub struct MotionSettings {
 }
 ```
 
-Motion settings are normalized before use. `smoothness` and `wander` are clamped to `0.0..=1.0`; `speed_scale` is clamped to `0.45..=1.6`.
+Motion settings are normalized before use. `smoothness` and `wander` are clamped to `0.0..=1.0`; `speed_scale` is clamped to `0.25..=2.4`. A `smoothness` value of `0.5` now matches the previous maximum smoothing response, with values above `0.5` adding extra damping.
+
+### `EcologySettings`
+
+Exported as `evo_1::simulation::EcologySettings`.
+
+```rust
+pub struct EcologySettings {
+    pub resource_growth_scale: f64,
+    pub reproduction_scale: f64,
+}
+```
+
+Ecology settings are normalized before use. Both fields are clamped to `0.25..=2.5`.
 
 ### `RuntimeCapabilities`
 
@@ -161,6 +177,7 @@ console.log(simulation.get_stats());
 - `set_parallel_resources_enabled(enabled: boolean)`
 - `is_parallel_resources_enabled() -> boolean`
 - `set_motion_controls(smoothness: number, speedScale: number, wander: number)`
+- `set_ecology_controls(resourceGrowthScale: number, reproductionScale: number)`
 
 Use `createEvoOneSimulation` for the browser UI because WebGPU device setup is asynchronous. The synchronous constructor is retained as a compatibility fallback path and initializes the WebGL/Canvas2D renderer.
 

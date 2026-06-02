@@ -11,6 +11,9 @@ pub use spatial::SpatialGrid;
 
 pub const PREDATOR_TRAIT_THRESHOLD: f64 = 0.5;
 const ATTACK_DRIVE_THRESHOLD: f64 = 0.55;
+const FAST_STEERING_RESPONSE: f64 = 0.82;
+const BALANCED_STEERING_RESPONSE: f64 = 0.08;
+const EXTRA_SMOOTH_STEERING_RESPONSE: f64 = 0.03;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct MotionSettings {
@@ -22,7 +25,7 @@ pub struct MotionSettings {
 impl Default for MotionSettings {
     fn default() -> Self {
         Self {
-            smoothness: 0.78,
+            smoothness: 0.5,
             speed_scale: 1.0,
             wander: 0.35,
         }
@@ -44,14 +47,22 @@ impl MotionSettings {
             smoothness: finite_or_default(self.smoothness, Self::default().smoothness)
                 .clamp(0.0, 1.0),
             speed_scale: finite_or_default(self.speed_scale, Self::default().speed_scale)
-                .clamp(0.45, 1.6),
+                .clamp(0.25, 2.4),
             wander: finite_or_default(self.wander, Self::default().wander).clamp(0.0, 1.0),
         }
     }
 
     fn steering_response(self) -> f64 {
         let settings = self.normalized();
-        0.08 + (1.0 - settings.smoothness) * 0.74
+        if settings.smoothness <= 0.5 {
+            BALANCED_STEERING_RESPONSE
+                + (0.5 - settings.smoothness)
+                    * ((FAST_STEERING_RESPONSE - BALANCED_STEERING_RESPONSE) / 0.5)
+        } else {
+            BALANCED_STEERING_RESPONSE
+                - (settings.smoothness - 0.5)
+                    * ((BALANCED_STEERING_RESPONSE - EXTRA_SMOOTH_STEERING_RESPONSE) / 0.5)
+        }
     }
 
     fn wander_probability(self) -> f64 {
@@ -1028,6 +1039,16 @@ impl EcsWorld {
     }
 
     pub fn handle_reproduction(&mut self) {
+        self.handle_reproduction_with_scale(1.0);
+    }
+
+    pub fn handle_reproduction_with_scale(&mut self, reproduction_scale: f64) {
+        let reproduction_scale = if reproduction_scale.is_finite() {
+            reproduction_scale.clamp(0.25, 2.5)
+        } else {
+            1.0
+        };
+
         if self.get_agent_count() >= self.reproduction_soft_cap() {
             return;
         }
@@ -1083,7 +1104,8 @@ impl EcsWorld {
                 let energy_factor =
                     (energy1.current / energy1.max).min(energy2.current / energy2.max);
                 let age_factor = (age1.value / 5.0).min(age2.value / 5.0).min(1.0); // Reduced age requirement
-                let reproduction_chance = energy_factor * age_factor * 0.25;
+                let reproduction_chance =
+                    (energy_factor * age_factor * 0.25 * reproduction_scale).min(0.95);
 
                 if self.rng.gen::<f64>() < reproduction_chance {
                     let mutation_rate = (genes1.mutation_rate + genes2.mutation_rate) / 2.0;
@@ -1449,6 +1471,15 @@ mod tests {
         let state = world.world.get::<&AgentState>(agent).expect("agent state");
         assert_eq!(state.state, AgentStateEnum::Feeding);
         assert!(state.target_x.is_some());
+    }
+
+    #[test]
+    fn smoothness_midpoint_matches_previous_maximum() {
+        let midpoint_response = MotionSettings::new(0.5, 1.0, 0.0).steering_response();
+
+        assert_eq!(midpoint_response, BALANCED_STEERING_RESPONSE);
+        assert!(MotionSettings::new(0.0, 1.0, 0.0).steering_response() > midpoint_response);
+        assert!(MotionSettings::new(1.0, 1.0, 0.0).steering_response() < midpoint_response);
     }
 
     #[test]

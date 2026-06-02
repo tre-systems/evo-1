@@ -101,6 +101,11 @@ impl EvoOneSimulation {
         self.simulation
             .set_motion_controls(smoothness, speed_scale, wander);
     }
+
+    pub fn set_ecology_controls(&mut self, resource_growth_scale: f64, reproduction_scale: f64) {
+        self.simulation
+            .set_ecology_controls(resource_growth_scale, reproduction_scale);
+    }
 }
 
 #[cfg(target_arch = "wasm32")]

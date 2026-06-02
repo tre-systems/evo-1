@@ -520,7 +520,7 @@
               <label class="control-row" for="motionSmoothness">
                 <span class="control-heading">
                   <span class="control-name">Smoothness</span>
-                  <output class="control-output" id="motionSmoothnessValue">78%</output>
+                  <output class="control-output" id="motionSmoothnessValue">50%</output>
                 </span>
                 <input
                   id="motionSmoothness"
@@ -528,7 +528,7 @@
                   min="0"
                   max="100"
                   step="1"
-                  value="78"
+                  value="50"
                 />
               </label>
               <label class="control-row" for="motionSpeed">
@@ -539,15 +539,15 @@
                 <input
                   id="motionSpeed"
                   type="range"
-                  min="45"
-                  max="160"
+                  min="25"
+                  max="240"
                   step="1"
                   value="100"
                 />
               </label>
               <label class="control-row" for="motionWander">
                 <span class="control-heading">
-                  <span class="control-name">Wander</span>
+                  <span class="control-name">Restlessness</span>
                   <output class="control-output" id="motionWanderValue">35%</output>
                 </span>
                 <input
@@ -557,6 +557,40 @@
                   max="100"
                   step="1"
                   value="35"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Ecology</p>
+            <div class="control-stack">
+              <label class="control-row" for="foodGrowth">
+                <span class="control-heading">
+                  <span class="control-name">Food Growth</span>
+                  <output class="control-output" id="foodGrowthValue">100%</output>
+                </span>
+                <input
+                  id="foodGrowth"
+                  type="range"
+                  min="25"
+                  max="250"
+                  step="1"
+                  value="100"
+                />
+              </label>
+              <label class="control-row" for="birthRate">
+                <span class="control-heading">
+                  <span class="control-name">Birth Rate</span>
+                  <output class="control-output" id="birthRateValue">100%</output>
+                </span>
+                <input
+                  id="birthRate"
+                  type="range"
+                  min="25"
+                  max="250"
+                  step="1"
+                  value="100"
                 />
               </label>
             </div>
@@ -695,6 +729,10 @@
       const motionSpeedValue = document.getElementById("motionSpeedValue");
       const motionWander = document.getElementById("motionWander");
       const motionWanderValue = document.getElementById("motionWanderValue");
+      const foodGrowth = document.getElementById("foodGrowth");
+      const foodGrowthValue = document.getElementById("foodGrowthValue");
+      const birthRate = document.getElementById("birthRate");
+      const birthRateValue = document.getElementById("birthRateValue");
 
       function updateStatus(message, type = "info") {
         statusDiv.className = `status ${type}`;
@@ -717,6 +755,11 @@
         motionWanderValue.textContent = `${motionWander.value}%`;
       }
 
+      function updateEcologyLabels() {
+        foodGrowthValue.textContent = `${foodGrowth.value}%`;
+        birthRateValue.textContent = `${birthRate.value}%`;
+      }
+
       function applyMotionControls() {
         updateMotionLabels();
         if (!simulation) return;
@@ -725,6 +768,16 @@
           Number(motionSmoothness.value) / 100,
           Number(motionSpeed.value) / 100,
           Number(motionWander.value) / 100,
+        );
+      }
+
+      function applyEcologyControls() {
+        updateEcologyLabels();
+        if (!simulation) return;
+
+        simulation.set_ecology_controls(
+          Number(foodGrowth.value) / 100,
+          Number(birthRate.value) / 100,
         );
       }
 
@@ -803,6 +856,7 @@
         stopSimulation();
         simulation.reset();
         applyMotionControls();
+        applyEcologyControls();
         updateStats(simulation.get_stats());
         updateStatus("Simulation reset", "info");
       }
@@ -860,8 +914,12 @@
       [motionSmoothness, motionSpeed, motionWander].forEach((control) => {
         control.addEventListener("input", applyMotionControls);
       });
+      [foodGrowth, birthRate].forEach((control) => {
+        control.addEventListener("input", applyEcologyControls);
+      });
 
       updateMotionLabels();
+      updateEcologyLabels();
 
       async function main() {
         try {
@@ -875,6 +933,7 @@
           updateStatus("Creating simulation", "info");
           simulation = await createEvoOneSimulation("canvas");
           applyMotionControls();
+          applyEcologyControls();
 
           const renderingMode = simulation.get_rendering_mode();
           console.log(`Rendering mode: ${renderingMode}`);
