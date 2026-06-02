@@ -64,9 +64,10 @@ python3 server.py
 
 Then open `http://127.0.0.1:8000` and verify:
 
-- The page reports that the simulation is ready.
-- `Start Simulation` advances the population, behavior-state, predator/prey, birth, and kill stats.
-- `Reset` returns the simulation to its configured initial population.
+- The page starts the simulation automatically.
+- The population, behavior-state, predator/prey, birth, and kill stats advance without pressing a start button.
+- `Reset Simulation` returns the simulation to its configured initial population and keeps it running.
+- The runtime panel reports renderer and CPU worker status.
 - The browser console does not show initialization errors.
 
 After the Cloudflare Pages deployment is active, smoke test `https://evo-1.tre.systems` after every pushed code change. If the production domain is not active yet, smoke test `http://127.0.0.1:8000` and the local `dist/` build.

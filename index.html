@@ -177,10 +177,9 @@
       }
 
       .panel-actions {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
         gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
       }
 
       button {
@@ -453,8 +452,7 @@
         }
 
         .panel-actions {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: minmax(0, 1fr);
         }
 
         .panel-actions button {
@@ -504,13 +502,9 @@
         </div>
 
         <div class="panel-actions">
-          <button id="startBtn" class="primary-action" type="button" disabled>
-            Start
+          <button id="resetBtn" class="primary-action" type="button" disabled>
+            Reset Simulation
           </button>
-          <button id="stopBtn" type="button" disabled>Stop</button>
-          <button id="resetBtn" type="button" disabled>Reset</button>
-          <button id="fullscreenBtn" type="button">Full Screen</button>
-          <button id="initParallelBtn" type="button" disabled>Threads</button>
         </div>
 
         <div class="metrics">
@@ -687,6 +681,12 @@
                   -
                 </div>
               </div>
+              <div class="stat-card">
+                <div class="stat-label">CPU Workers</div>
+                <div class="stat-value stat-value-small" id="workerStatus">
+                  -
+                </div>
+              </div>
             </div>
           </section>
         </div>
@@ -706,18 +706,13 @@
 
       let simulation = null;
       let processor = null;
-      let animationId = null;
       let isRunning = false;
       let parallelInitialized = false;
       let frameCount = 0;
       let lastTime = performance.now();
 
       const statusDiv = document.getElementById("status");
-      const startBtn = document.getElementById("startBtn");
-      const stopBtn = document.getElementById("stopBtn");
       const resetBtn = document.getElementById("resetBtn");
-      const fullscreenBtn = document.getElementById("fullscreenBtn");
-      const initParallelBtn = document.getElementById("initParallelBtn");
       const hidePanelBtn = document.getElementById("hidePanelBtn");
       const showPanelBtn = document.getElementById("showPanelBtn");
       const controlPanel = document.getElementById("controlPanel");
@@ -747,6 +742,10 @@
 
       function updateRunningState(running) {
         document.body.dataset.running = running ? "true" : "false";
+      }
+
+      function updateWorkerStatus(status) {
+        document.getElementById("workerStatus").textContent = status;
       }
 
       function updateMotionLabels() {
@@ -818,99 +817,62 @@
       }
 
       function animate() {
-        if (!isRunning) return;
+        if (!simulation || !isRunning) return;
 
         simulation.update();
         updateStats(simulation.get_stats());
         updateFPS();
 
-        animationId = requestAnimationFrame(animate);
+        requestAnimationFrame(animate);
       }
 
       function startSimulation() {
-        if (!simulation) return;
+        if (!simulation || isRunning) return;
 
         isRunning = true;
         updateRunningState(true);
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
         animate();
         updateStatus("Simulation running", "success");
-      }
-
-      function stopSimulation() {
-        isRunning = false;
-        updateRunningState(false);
-        if (animationId) {
-          cancelAnimationFrame(animationId);
-          animationId = null;
-        }
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        updateStatus("Simulation stopped", "info");
       }
 
       function resetSimulation() {
         if (!simulation) return;
 
-        stopSimulation();
         simulation.reset();
         applyMotionControls();
         applyEcologyControls();
         updateStats(simulation.get_stats());
         updateStatus("Simulation reset", "info");
-      }
-
-      async function toggleFullscreen() {
-        try {
-          if (!document.fullscreenElement) {
-            await document.documentElement.requestFullscreen?.();
-          } else {
-            await document.exitFullscreen?.();
-          }
-        } catch (error) {
-          updateStatus(`Full screen unavailable: ${error}`, "error");
+        if (!isRunning) {
+          startSimulation();
         }
       }
 
-      function updateFullscreenLabel() {
-        fullscreenBtn.textContent = document.fullscreenElement
-          ? "Exit Full"
-          : "Full Screen";
-      }
-
-      async function initializeParallelProcessing() {
+      async function initializeWorkerThreads() {
         if (!processor || parallelInitialized) return;
 
         try {
-          initParallelBtn.disabled = true;
-          updateStatus("Initializing worker threads", "info");
+          updateWorkerStatus("Starting");
           await processor.initialize();
 
           if (processor.is_rayon_available()) {
             parallelInitialized = true;
             simulation?.set_parallel_resources_enabled(true);
-            updateStatus("Worker threads enabled", "success");
+            updateWorkerStatus("On");
           } else {
             simulation?.set_parallel_resources_enabled(false);
-            initParallelBtn.disabled = false;
-            updateStatus("Worker threads unavailable", "error");
+            updateWorkerStatus("Off");
           }
         } catch (error) {
           simulation?.set_parallel_resources_enabled(false);
-          initParallelBtn.disabled = false;
-          updateStatus(`Thread initialization failed: ${error}`, "error");
+          updateWorkerStatus("Off");
+          console.warn("CPU worker initialization failed:", error);
         }
       }
 
-      startBtn.addEventListener("click", startSimulation);
-      stopBtn.addEventListener("click", stopSimulation);
       resetBtn.addEventListener("click", resetSimulation);
-      fullscreenBtn.addEventListener("click", toggleFullscreen);
-      initParallelBtn.addEventListener("click", initializeParallelProcessing);
       hidePanelBtn.addEventListener("click", () => setPanelOpen(false));
       showPanelBtn.addEventListener("click", () => setPanelOpen(true));
-      document.addEventListener("fullscreenchange", updateFullscreenLabel);
       [motionSmoothness, motionSpeed, motionWander].forEach((control) => {
         control.addEventListener("input", applyMotionControls);
       });
@@ -928,7 +890,7 @@
 
           updateStatus("Preparing runtime", "info");
           processor = new ParallelProcessor();
-          initParallelBtn.disabled = false;
+          updateWorkerStatus("Starting");
 
           updateStatus("Creating simulation", "info");
           simulation = await createEvoOneSimulation("canvas");
@@ -942,11 +904,9 @@
 
           updateStats(simulation.get_stats());
 
-          startBtn.disabled = false;
           resetBtn.disabled = false;
-          initParallelBtn.disabled = false;
-
-          updateStatus("evo-1 ready", "success");
+          startSimulation();
+          void initializeWorkerThreads();
         } catch (error) {
           updateStatus(`Initialization failed: ${error}`, "error");
           console.error("Initialization error:", error);
