@@ -13,3 +13,15 @@
 
 /pkg/*
   Cache-Control: no-cache
+
+/pkg/*.js
+  Cache-Control: no-cache
+
+/pkg/*.wasm
+  Cache-Control: no-cache
+
+/pkg/evo_1.js
+  Cache-Control: no-cache
+
+/pkg/evo_1_bg.wasm
+  Cache-Control: no-cache

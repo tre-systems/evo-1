@@ -18,7 +18,8 @@ The build script:
 
 1. Runs the threaded WASM package build.
 2. Creates a fresh `dist/` directory.
-3. Copies `index.html`, `LICENSE`, the generated `pkg/` files, and `public/_headers`.
+3. Writes `dist/index.html` with the generated JS import stamped by the current commit hash.
+4. Copies `LICENSE`, the generated `pkg/` files, and `public/_headers`.
 
 ## Direct Upload
 
@@ -77,6 +78,6 @@ The browser app can use `SharedArrayBuffer` and threaded WASM only when served w
 - `Cross-Origin-Opener-Policy: same-origin`
 - `Cross-Origin-Embedder-Policy: require-corp`
 - conservative browser security headers
-- `Cache-Control: no-cache` for the app shell and WASM package files
+- `Cache-Control: no-cache` for the app shell and generated JS/WASM package files
 
 Keep the cache policy conservative until the build produces fingerprinted asset filenames.
