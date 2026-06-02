@@ -333,6 +333,52 @@
         color: #ff8d8d;
       }
 
+      .control-stack {
+        display: grid;
+        gap: 10px;
+        padding: 2px 0 4px;
+      }
+
+      .control-row {
+        display: grid;
+        gap: 6px;
+      }
+
+      .control-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .control-name,
+      .control-output {
+        overflow: hidden;
+        font-size: 0.64rem;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .control-name {
+        color: var(--faint);
+      }
+
+      .control-output {
+        color: var(--cyan);
+        font-variant-numeric: tabular-nums;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        height: 18px;
+        margin: 0;
+        accent-color: var(--cyan);
+        cursor: pointer;
+      }
+
       .stat-value-small {
         font-size: clamp(0.95rem, 3vw, 1.2rem);
         line-height: 1.1;
@@ -469,6 +515,54 @@
 
         <div class="metrics">
           <section class="metric-section">
+            <p class="section-label">Motion</p>
+            <div class="control-stack">
+              <label class="control-row" for="motionSmoothness">
+                <span class="control-heading">
+                  <span class="control-name">Smoothness</span>
+                  <output class="control-output" id="motionSmoothnessValue">78%</output>
+                </span>
+                <input
+                  id="motionSmoothness"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="78"
+                />
+              </label>
+              <label class="control-row" for="motionSpeed">
+                <span class="control-heading">
+                  <span class="control-name">Speed</span>
+                  <output class="control-output" id="motionSpeedValue">100%</output>
+                </span>
+                <input
+                  id="motionSpeed"
+                  type="range"
+                  min="45"
+                  max="160"
+                  step="1"
+                  value="100"
+                />
+              </label>
+              <label class="control-row" for="motionWander">
+                <span class="control-heading">
+                  <span class="control-name">Wander</span>
+                  <output class="control-output" id="motionWanderValue">35%</output>
+                </span>
+                <input
+                  id="motionWander"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="35"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section class="metric-section">
             <p class="section-label">Population</p>
             <div class="stats">
               <div class="stat-card">
@@ -593,6 +687,14 @@
       const hidePanelBtn = document.getElementById("hidePanelBtn");
       const showPanelBtn = document.getElementById("showPanelBtn");
       const controlPanel = document.getElementById("controlPanel");
+      const motionSmoothness = document.getElementById("motionSmoothness");
+      const motionSmoothnessValue = document.getElementById(
+        "motionSmoothnessValue",
+      );
+      const motionSpeed = document.getElementById("motionSpeed");
+      const motionSpeedValue = document.getElementById("motionSpeedValue");
+      const motionWander = document.getElementById("motionWander");
+      const motionWanderValue = document.getElementById("motionWanderValue");
 
       function updateStatus(message, type = "info") {
         statusDiv.className = `status ${type}`;
@@ -607,6 +709,23 @@
 
       function updateRunningState(running) {
         document.body.dataset.running = running ? "true" : "false";
+      }
+
+      function updateMotionLabels() {
+        motionSmoothnessValue.textContent = `${motionSmoothness.value}%`;
+        motionSpeedValue.textContent = `${motionSpeed.value}%`;
+        motionWanderValue.textContent = `${motionWander.value}%`;
+      }
+
+      function applyMotionControls() {
+        updateMotionLabels();
+        if (!simulation) return;
+
+        simulation.set_motion_controls(
+          Number(motionSmoothness.value) / 100,
+          Number(motionSpeed.value) / 100,
+          Number(motionWander.value) / 100,
+        );
       }
 
       function updateStats(stats) {
@@ -683,6 +802,7 @@
 
         stopSimulation();
         simulation.reset();
+        applyMotionControls();
         updateStats(simulation.get_stats());
         updateStatus("Simulation reset", "info");
       }
@@ -737,6 +857,11 @@
       hidePanelBtn.addEventListener("click", () => setPanelOpen(false));
       showPanelBtn.addEventListener("click", () => setPanelOpen(true));
       document.addEventListener("fullscreenchange", updateFullscreenLabel);
+      [motionSmoothness, motionSpeed, motionWander].forEach((control) => {
+        control.addEventListener("input", applyMotionControls);
+      });
+
+      updateMotionLabels();
 
       async function main() {
         try {
@@ -749,6 +874,7 @@
 
           updateStatus("Creating simulation", "info");
           simulation = await createEvoOneSimulation("canvas");
+          applyMotionControls();
 
           const renderingMode = simulation.get_rendering_mode();
           console.log(`Rendering mode: ${renderingMode}`);

@@ -1,5 +1,5 @@
 use crate::agent::Agent;
-use crate::ecs::{AgentStateEnum, EcsWorld, PREDATOR_TRAIT_THRESHOLD};
+use crate::ecs::{AgentStateEnum, EcsWorld, MotionSettings, PREDATOR_TRAIT_THRESHOLD};
 use crate::resource::Resource;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -117,6 +117,7 @@ pub struct SimulationConfig {
     pub initial_agents: usize,
     pub initial_resources: usize,
     pub seed: Option<u64>,
+    pub motion: MotionSettings,
 }
 
 impl Default for SimulationConfig {
@@ -129,6 +130,7 @@ impl Default for SimulationConfig {
             initial_agents: 500,
             initial_resources: 500,
             seed: None,
+            motion: MotionSettings::default(),
         }
     }
 }
@@ -301,11 +303,12 @@ impl Simulation {
 
         // Update agents sequentially using the optimized ECS method
         for entity in agent_entities {
-            self.ecs_world.update_single_agent_optimized(
+            self.ecs_world.update_single_agent_optimized_with_motion(
                 entity,
                 delta_time,
                 self.config.width,
                 self.config.height,
+                self.config.motion,
             );
         }
     }
@@ -337,6 +340,14 @@ impl Simulation {
 
     pub fn runtime_capabilities(&self) -> RuntimeCapabilities {
         self.runtime_capabilities
+    }
+
+    pub fn set_motion_controls(&mut self, smoothness: f64, speed_scale: f64, wander: f64) {
+        self.config.motion = MotionSettings::new(smoothness, speed_scale, wander);
+    }
+
+    pub fn motion_settings(&self) -> MotionSettings {
+        self.config.motion
     }
 
     pub fn get_stats(&self) -> SimulationStats {

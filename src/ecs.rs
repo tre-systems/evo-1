@@ -1,5 +1,6 @@
 use hecs::World;
 use rand::{prelude::*, rngs::StdRng, SeedableRng};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 mod components;
@@ -10,6 +11,61 @@ pub use spatial::SpatialGrid;
 
 pub const PREDATOR_TRAIT_THRESHOLD: f64 = 0.5;
 const ATTACK_DRIVE_THRESHOLD: f64 = 0.55;
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct MotionSettings {
+    pub smoothness: f64,
+    pub speed_scale: f64,
+    pub wander: f64,
+}
+
+impl Default for MotionSettings {
+    fn default() -> Self {
+        Self {
+            smoothness: 0.78,
+            speed_scale: 1.0,
+            wander: 0.35,
+        }
+    }
+}
+
+impl MotionSettings {
+    pub fn new(smoothness: f64, speed_scale: f64, wander: f64) -> Self {
+        Self {
+            smoothness,
+            speed_scale,
+            wander,
+        }
+        .normalized()
+    }
+
+    pub fn normalized(self) -> Self {
+        Self {
+            smoothness: finite_or_default(self.smoothness, Self::default().smoothness)
+                .clamp(0.0, 1.0),
+            speed_scale: finite_or_default(self.speed_scale, Self::default().speed_scale)
+                .clamp(0.45, 1.6),
+            wander: finite_or_default(self.wander, Self::default().wander).clamp(0.0, 1.0),
+        }
+    }
+
+    fn steering_response(self) -> f64 {
+        let settings = self.normalized();
+        0.08 + (1.0 - settings.smoothness) * 0.74
+    }
+
+    fn wander_probability(self) -> f64 {
+        0.08 * self.normalized().wander
+    }
+}
+
+fn finite_or_default(value: f64, default: f64) -> f64 {
+    if value.is_finite() {
+        value
+    } else {
+        default
+    }
+}
 
 #[derive(Clone, Copy)]
 struct NearbyResource {
@@ -448,6 +504,24 @@ impl EcsWorld {
         canvas_width: f64,
         canvas_height: f64,
     ) {
+        self.update_single_agent_optimized_with_motion(
+            entity,
+            delta_time,
+            canvas_width,
+            canvas_height,
+            MotionSettings::default(),
+        );
+    }
+
+    pub fn update_single_agent_optimized_with_motion(
+        &mut self,
+        entity: hecs::Entity,
+        delta_time: f64,
+        canvas_width: f64,
+        canvas_height: f64,
+        motion_settings: MotionSettings,
+    ) {
+        let motion_settings = motion_settings.normalized();
         let (
             sense_range,
             personal_space,
@@ -666,7 +740,7 @@ impl EcsWorld {
             }
         }
 
-        let random_turn = self.rng.gen::<f64>() < 0.08;
+        let random_turn = self.rng.gen::<f64>() < motion_settings.wander_probability();
         let random_turn_angle = self.rng.gen_range(0.0..2.0 * std::f64::consts::PI);
         let fallback_angle = self.rng.gen_range(0.0..2.0 * std::f64::consts::PI);
 
@@ -697,6 +771,11 @@ impl EcsWorld {
         energy.current -= total_energy_cost / genes.energy_efficiency;
 
         state.state = decision.state;
+        let base_speed = genes.speed * motion_settings.speed_scale;
+        let mut desired_dx = vel.dx;
+        let mut desired_dy = vel.dy;
+        let mut has_desired_velocity = false;
+
         if let Some((tx, ty)) = decision.target {
             state.target_x = Some(tx);
             state.target_y = Some(ty);
@@ -705,30 +784,56 @@ impl EcsWorld {
             let dy = ty - pos.y;
             let distance = (dx * dx + dy * dy).sqrt();
             if distance > 0.0 {
-                vel.dx = (dx / distance) * genes.speed * decision.speed_multiplier;
-                vel.dy = (dy / distance) * genes.speed * decision.speed_multiplier;
+                let target_speed = base_speed * decision.speed_multiplier;
+                desired_dx = (dx / distance) * target_speed;
+                desired_dy = (dy / distance) * target_speed;
+                has_desired_velocity = true;
             }
         } else {
             state.target_x = None;
             state.target_y = None;
 
             if random_turn {
-                vel.dx = random_turn_angle.cos() * genes.speed;
-                vel.dy = random_turn_angle.sin() * genes.speed;
+                desired_dx = random_turn_angle.cos() * base_speed;
+                desired_dy = random_turn_angle.sin() * base_speed;
+                has_desired_velocity = true;
             }
 
             let current_speed = (vel.dx * vel.dx + vel.dy * vel.dy).sqrt();
-            if current_speed < genes.speed * 0.5 {
-                vel.dx = fallback_angle.cos() * genes.speed;
-                vel.dy = fallback_angle.sin() * genes.speed;
+            if current_speed < base_speed * 0.5 {
+                desired_dx = fallback_angle.cos() * base_speed;
+                desired_dy = fallback_angle.sin() * base_speed;
+                has_desired_velocity = true;
+            } else if !has_desired_velocity && current_speed > 0.0 {
+                desired_dx = (vel.dx / current_speed) * base_speed;
+                desired_dy = (vel.dy / current_speed) * base_speed;
+                has_desired_velocity = true;
             }
         }
 
-        vel.dx += avoidance_dx * genes.speed * 0.4;
-        vel.dy += avoidance_dy * genes.speed * 0.4;
+        let avoidance_strength = (avoidance_dx * avoidance_dx + avoidance_dy * avoidance_dy).sqrt();
+        if avoidance_strength > 0.0 {
+            desired_dx += avoidance_dx * base_speed * 0.4;
+            desired_dy += avoidance_dy * base_speed * 0.4;
+            has_desired_velocity = true;
+        }
+
+        if has_desired_velocity {
+            let mut steering_response = motion_settings.steering_response();
+            if matches!(
+                decision.state,
+                AgentStateEnum::Fleeing | AgentStateEnum::Fighting
+            ) {
+                steering_response = (steering_response * 1.3).min(0.68);
+            }
+
+            vel.dx += (desired_dx - vel.dx) * steering_response;
+            vel.dy += (desired_dy - vel.dy) * steering_response;
+        }
 
         let current_speed = (vel.dx * vel.dx + vel.dy * vel.dy).sqrt();
-        let max_speed = own_speed * decision.speed_multiplier.max(1.0) * 1.35;
+        let max_speed =
+            own_speed * motion_settings.speed_scale * decision.speed_multiplier.max(1.0) * 1.35;
         if current_speed > max_speed {
             vel.dx = (vel.dx / current_speed) * max_speed;
             vel.dy = (vel.dy / current_speed) * max_speed;
@@ -1344,6 +1449,37 @@ mod tests {
         let state = world.world.get::<&AgentState>(agent).expect("agent state");
         assert_eq!(state.state, AgentStateEnum::Feeding);
         assert!(state.target_x.is_some());
+    }
+
+    #[test]
+    fn smooth_motion_turns_toward_targets_without_snapping() {
+        let mut world =
+            EcsWorld::new_with_population_and_seed(100.0, 100.0, 10, 10, 0, 0, Some(11));
+        let agent = world.spawn_agent(50.0, 50.0, baseline_genes(), 0);
+        spawn_test_resource(&mut world, 80.0, 50.0);
+
+        {
+            let mut velocity = world
+                .world
+                .get::<&mut Velocity>(agent)
+                .expect("agent velocity");
+            velocity.dx = 0.0;
+            velocity.dy = 2.0;
+        }
+
+        world.update_spatial_grid();
+        world.update_single_agent_optimized_with_motion(
+            agent,
+            1.0 / 60.0,
+            100.0,
+            100.0,
+            MotionSettings::new(1.0, 1.0, 0.0),
+        );
+
+        let velocity = world.world.get::<&Velocity>(agent).expect("agent velocity");
+        assert!(velocity.dx > 0.0);
+        assert!(velocity.dx < 0.5);
+        assert!(velocity.dy > 1.0);
     }
 
     #[test]

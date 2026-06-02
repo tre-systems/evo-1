@@ -96,6 +96,11 @@ impl EvoOneSimulation {
     pub fn is_parallel_resources_enabled(&self) -> bool {
         self.simulation.runtime_capabilities().parallel_resources
     }
+
+    pub fn set_motion_controls(&mut self, smoothness: f64, speed_scale: f64, wander: f64) {
+        self.simulation
+            .set_motion_controls(smoothness, speed_scale, wander);
+    }
 }
 
 #[cfg(target_arch = "wasm32")]

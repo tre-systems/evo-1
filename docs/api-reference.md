@@ -10,11 +10,8 @@ use evo_1::simulation::{RuntimeCapabilities, Simulation, SimulationConfig};
 let config = SimulationConfig {
     width: 1000.0,
     height: 800.0,
-    max_agents: 5000,
-    max_resources: 2000,
-    initial_agents: 500,
-    initial_resources: 500,
     seed: Some(42),
+    ..SimulationConfig::default()
 };
 
 let mut simulation = Simulation::new_with_config_and_capabilities(
@@ -37,6 +34,8 @@ let stats = simulation.get_stats();
 - `reset(&mut self)`
 - `set_runtime_capabilities(&mut self, runtime_capabilities: RuntimeCapabilities)`
 - `runtime_capabilities(&self) -> RuntimeCapabilities`
+- `set_motion_controls(&mut self, smoothness: f64, speed_scale: f64, wander: f64)`
+- `motion_settings(&self) -> MotionSettings`
 - `get_stats(&self) -> SimulationStats`
 - `agent_count(&self) -> usize`
 - `resource_count(&self) -> usize`
@@ -55,11 +54,26 @@ pub struct SimulationConfig {
     pub initial_agents: usize,
     pub initial_resources: usize,
     pub seed: Option<u64>,
+    pub motion: MotionSettings,
 }
 ```
 
 Initial counts are clamped to the max counts when the ECS world is created or reset.
 When `seed` is set, initial placement, random movement, inheritance, reproduction pairing, and resource spawning are reproducible for the same update sequence.
+
+### `MotionSettings`
+
+Exported as `evo_1::ecs::MotionSettings`.
+
+```rust
+pub struct MotionSettings {
+    pub smoothness: f64,
+    pub speed_scale: f64,
+    pub wander: f64,
+}
+```
+
+Motion settings are normalized before use. `smoothness` and `wander` are clamped to `0.0..=1.0`; `speed_scale` is clamped to `0.45..=1.6`.
 
 ### `RuntimeCapabilities`
 
@@ -146,6 +160,7 @@ console.log(simulation.get_stats());
 - `get_rendering_mode() -> string`
 - `set_parallel_resources_enabled(enabled: boolean)`
 - `is_parallel_resources_enabled() -> boolean`
+- `set_motion_controls(smoothness: number, speedScale: number, wander: number)`
 
 Use `createEvoOneSimulation` for the browser UI because WebGPU device setup is asynchronous. The synchronous constructor is retained as a compatibility fallback path and initializes the WebGL/Canvas2D renderer.
 
