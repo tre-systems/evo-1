@@ -14,6 +14,9 @@ wasm-pack build --target web
 
 if [ $? -eq 0 ]; then
     echo "✅ Build successful!"
+    if command -v node &> /dev/null; then
+        node scripts/write-sentry-config.mjs evo-1 sentry-config.js
+    fi
     
     # Check if Rayon workers were generated and fix them if needed
     WORKER_FILE=$(find pkg/snippets -name "workerHelpers.js" -type f 2>/dev/null | head -n 1)
