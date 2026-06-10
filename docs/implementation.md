@@ -1,0 +1,206 @@
+# Architecture and Patterns
+
+This document is the source of truth for evo-1's architectural shape and recurring implementation patterns. Public callable APIs are documented in [api-reference.md](api-reference.md); generated diagrams are documented in [diagrams/README.md](diagrams/README.md).
+
+## System Shape
+
+evo-1 has one simulation core with two runtime adapters:
+
+- Browser runtime: `index.html` loads the generated WASM package and calls `createEvoOneSimulation`, `EvoOneSimulation`, and `ParallelProcessor` from [src/lib.rs](../src/lib.rs).
+- Native runtime: [src/bin/headless.rs](../src/bin/headless.rs) parses CLI arguments and runs `HeadlessSimulation` from [src/headless.rs](../src/headless.rs).
+- Shared core: [src/simulation.rs](../src/simulation.rs) owns the public simulation facade and delegates world mutation to [src/ecs.rs](../src/ecs.rs).
+
+The diagrams show the same model visually:
+
+- [System overview](diagrams/system-overview.png)
+- [Frame pipeline](diagrams/frame-pipeline.png)
+- [Runtime model](diagrams/runtime-model.png)
+
+## Module Map
+
+| Module | Responsibility |
+| --- | --- |
+| [src/lib.rs](../src/lib.rs) | Crate exports plus WASM-only `createEvoOneSimulation`, `EvoOneSimulation`, `ParallelProcessor`, and panic hook bindings. |
+| [src/simulation.rs](../src/simulation.rs) | Stable facade for construction, updates, commands, stats, runtime capabilities, and snapshot DTO conversion. |
+| [src/ecs.rs](../src/ecs.rs) | ECS world ownership, entity spawning, ordered systems, frame-event ledger, lifecycle rules, and query helpers. |
+| [src/ecs/components.rs](../src/ecs/components.rs) | Data-only components and marker tags such as `AgentTag` and `ResourceTag`. |
+| [src/ecs/spatial.rs](../src/ecs/spatial.rs) | Spatial grid used for nearby-entity lookups. |
+| [src/genes.rs](../src/genes.rs) | Compatibility import path for the canonical ECS `Genes` component plus gene construction and inheritance helpers. |
+| [src/agent.rs](../src/agent.rs) | Read-only agent snapshot DTO exposed to renderers and external callers. |
+| [src/resource.rs](../src/resource.rs) | Read-only resource snapshot DTO exposed to renderers and external callers. |
+| [src/renderer.rs](../src/renderer.rs) | WASM-only renderer with WebGPU first, then WebGL and Canvas2D fallbacks. |
+| [src/headless.rs](../src/headless.rs) | Native experiment runner and diagnostics aggregation. |
+
+## Pattern Catalog
+
+### Boundary Adapter
+
+Platform-specific code stays at the edge:
+
+- `EvoOneSimulation` converts browser/WASM calls into `Simulation` calls.
+- `ParallelProcessor` owns WASM thread-pool initialization and exposes readiness as a capability.
+- `HeadlessSimulation` owns native run configuration, Rayon setup, progress output, and diagnostics.
+
+Core simulation rules should not depend on browser APIs, DOM objects, CLI parsing, or stdout formatting.
+
+### Simulation Facade
+
+`Simulation` is the public core API. It owns `SimulationConfig`, `RuntimeCapabilities`, the frame clock, and an `EcsWorld`.
+
+Callers should use `Simulation` for construction, reset, updates, counts, stats, and snapshot reads. New behavior that mutates entities should live in the ECS world or a focused ECS system helper, then be called by the `Simulation::update` pipeline.
+
+### Config-Driven Construction
+
+Population limits and initial counts flow through `SimulationConfig`. `Simulation::new_with_config_and_capabilities` is the most explicit constructor because it records both simulation size and runtime feature support.
+
+Initial counts are clamped to maximum counts when the ECS world is created or reset. Optional seeds flow through the same config path so deterministic scenarios and browser defaults use the same constructor rules. Avoid adding constructors that bypass this path.
+
+### Seeded Scenario
+
+`SimulationConfig::seed` and `HeadlessConfig::seed` make experiments reproducible. A seeded run owns its random number generator inside `EcsWorld`; systems should draw randomness from that world-owned generator rather than creating ad hoc thread-local generators.
+
+Use seeds for scenario scripts, regression tests, and behavior probes. Leave the seed empty for normal browser exploration when freshness matters more than repeatability.
+
+### Explicit Runtime Capability
+
+Parallel resource updates are controlled by:
+
+```rust
+RuntimeCapabilities {
+    parallel_resources: bool,
+}
+```
+
+Native headless runs enable this around a global Rayon pool that the runner initializes or reuses. Browser runs enable it only after `ParallelProcessor.initialize()` confirms the WASM worker pool is available. The core update path reads the capability; it does not infer platform support itself.
+
+### ECS Entity Shape
+
+Entity roles are expressed with marker tags:
+
+- Agent entities have `AgentTag`, position, velocity, energy, age, genes, state, size, and animation components.
+- Resource entities have `ResourceTag`, position, resource data, and size.
+
+Components should stay data-oriented. Behavior belongs in ECS system functions, not component methods, except for small local invariants such as resource availability or gene inheritance.
+
+### Ordered Frame Pipeline
+
+`Simulation::update` is the primary frame pipeline:
+
+1. Advance fixed delta time.
+2. Clear the per-frame event ledger.
+3. Rebuild the spatial grid.
+4. Update resources through the sequential or parallel resource path.
+5. Resolve resource consumption and predator/prey interactions.
+6. Update agents with a spatial decision snapshot for food, threats, prey, mates, targets, movement, and energy costs.
+7. Despawn dead agents and record deaths.
+8. Reproduce eligible agents and record births.
+9. Remove depleted resources.
+10. Replenish resources back toward the scenario floor.
+
+Preserve this ordering unless the behavior change explicitly requires a different causality model. In particular, stats and rendering assume a committed frame after lifecycle cleanup.
+
+### Collect-Then-Mutate
+
+Many ECS operations first collect entity IDs or cloneable component snapshots, then mutate the world in a second pass. This avoids borrow conflicts and keeps parallel work away from direct `hecs::World` mutation.
+
+The parallel resource path follows this pattern:
+
+1. Collect resource entity IDs and cloned resource components.
+2. Compute updated resources in parallel.
+3. Apply updates sequentially back into the world.
+
+Use the same pattern for any new system that needs multiple reads before mutation, or any system that may become parallel later.
+
+### Spatial Query
+
+The spatial grid is rebuilt once at the start of the public frame pipeline and is used for:
+
+- nearby resources for feeding and food targeting,
+- nearby agents for threat detection, prey choice, and mate choice,
+- nearby agents for personal-space avoidance,
+- resource consumption checks,
+- predator/prey checks.
+
+New proximity behavior should use `SpatialGrid` instead of broad all-pairs scans. If a new behavior needs positions that change during the same frame, document where the grid is refreshed or why stale-within-frame positions are acceptable.
+
+### Behavior Decision
+
+`EcsWorld::update_single_agent_optimized` uses the collect-then-mutate pattern inside each agent update: it reads nearby resources and agents into small immutable snapshots, chooses one `AgentDecision`, then mutates the current agent's state, target, velocity, age, and energy.
+
+Decision priority is:
+
+1. Flee from stronger nearby threats, especially when energy is low.
+2. Hunt or fight weaker prey when predator drive or aggression is high enough.
+3. Seek a nearby mate when the same eligibility rule used by reproduction is satisfied.
+4. Feed from nearby resources or hunt toward the best available resource.
+5. Seek by wandering when no stronger signal is available.
+
+The public state names are current behavior states, not historical transitions: `Seeking`, `Hunting`, `Feeding`, `Fleeing`, `Fighting`, and `Reproducing`. Predator/prey telemetry uses `PREDATOR_TRAIT_THRESHOLD` from [src/ecs.rs](../src/ecs.rs) so the UI, headless output, and tests share one classification rule.
+
+### Frame Event Ledger
+
+`EcsWorld::frame_events` records per-frame facts such as consumed resources, agent kills, deaths, and births. Aggregated counters feed `SimulationStats` and `SimulationDiagnostics`.
+
+When adding user-visible lifecycle behavior, add the event at the mutation site rather than recomputing it later from final state.
+
+Snapshot telemetry such as state distribution, predator/prey mix, target counts, and reproduction candidates is derived from committed ECS state in `Simulation::get_stats`; it does not belong in `FrameEvent` unless it represents a discrete lifecycle fact.
+
+### Snapshot DTO
+
+The active writable model is ECS. `agent::Agent` and `resource::Resource` are read-only snapshots produced for rendering and API callers. They should not become a second domain model.
+
+`genes::Genes` is a compatibility re-export of the ECS `Genes` component, not a separate snapshot type.
+
+### Rendering Strategy
+
+Rendering is browser-only and reads snapshots from `Simulation`. `WebRenderer` attempts WebGPU first and falls back to WebGL, then Canvas2D, when WebGPU setup is unavailable.
+
+Rendering code should stay read-only with respect to simulation rules. Add render-specific fields to snapshot DTOs only when they are stable API data; otherwise prefer a dedicated render snapshot type.
+
+WebGPU should be used for batched visual work: organism bodies, quieter resources, motion trails, heatmaps, and short-lived birth/death/combat effects. WebGL and Canvas2D are compatibility paths, not the primary place to add richer visual systems.
+
+### Diagnostics Summary
+
+The native runner converts final stats into `SimulationDiagnostics`: duration, steps, stability flags, generation progress, reproduction/death totals, and a quality score.
+
+Diagnostics are run summaries, not simulation rules. Keep scoring changes inside [src/headless.rs](../src/headless.rs).
+
+### Generated Diagram Documentation
+
+Complex diagrams use Graphviz `.dot` sources under [docs/diagrams](diagrams). Rendered PNGs are committed for easy browser and GitHub reading.
+
+Use Mermaid only for small inline sketches. For architecture diagrams, update the `.dot` file and regenerate PNGs with:
+
+```bash
+node scripts/render-diagrams.mjs
+node scripts/check-diagrams.mjs
+```
+
+## Build and Runtime Notes
+
+The browser package is built by [scripts/build-wasm.sh](../scripts/build-wasm.sh). The Cloudflare Pages bundle is built by [scripts/build-pages.sh](../scripts/build-pages.sh) into `dist/`. These scripts use:
+
+- `nightly-2024-08-02`,
+- `rust-src`,
+- `wasm32-unknown-unknown`,
+- `wasm-pack --target web`,
+- atomics and bulk-memory target features,
+- the `wasm-bindgen-rayon` feature with `no-bundler`.
+
+The local development server is [server.py](../server.py). It binds to `127.0.0.1`, serves static files, and sends COOP/COEP headers required for browser thread support.
+
+The full local check suite is [scripts/check.sh](../scripts/check.sh). It covers Rust formatting, clippy, tests, stable WASM checking, threaded-WASM checking, and diagram validation.
+
+## Patterns to Tighten Next
+
+These are the current architecture pressure points to address before adding larger features:
+
+- Split the largest ECS systems into focused system modules once behavior changes require it. Today they are still understandable in one file, but `EcsWorld` is the main growth risk.
+- Replace full agent/resource DTO cloning with compact render-specific snapshots if browser rendering or API serialization becomes a bottleneck.
+- Collapse the resource `Size` duplication. Resource entities currently carry both `Resource::size` and a `Size` component, so future resource-rendering changes should pick one source of truth.
+- Extract decision scoring from `EcsWorld` into focused system helpers if behavior policy work grows beyond the current food, threat, prey, and mate decisions.
+- Move richer visual effects toward explicit render snapshots and WebGPU buffers rather than adding browser-only presentation fields to the core ECS model.
+
+## Documentation Boundary
+
+Keep this file about architecture and patterns. Do not duplicate full public APIs here; update [api-reference.md](api-reference.md) instead. Do not record benchmark-style claims here unless they are produced by a committed benchmark and include the command used to reproduce them.

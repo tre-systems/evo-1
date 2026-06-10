@@ -1,0 +1,111 @@
+# Product Vision and Research Notes
+
+evo-1 should become a browser-visible artificial life world where agents compete, survive, reproduce, diverge into strategies, and leave an inspectable evolutionary history.
+
+Within the TRE evo series, evo-1 is the selection-field ecology project: it should prioritize legible selection pressure, repeatable scenarios, and explainable outcomes. The sibling `evo` project can remain the higher-scale particle/GPU sandbox.
+
+The project should not stop at rendering many moving dots. The core experience is discovery: watching a population become better adapted, seeing lineages rise and collapse, and understanding which traits or behaviors caused that change.
+
+## Current Gap
+
+The cleaned-up architecture is a good foundation, but the simulation needs stronger product direction:
+
+- Evolution must be repeatable enough to test and tune.
+- Standard scenarios should survive long enough to produce later generations.
+- Agents need meaningful choices between food, mates, threats, prey, escape, and combat.
+- The browser UI should explain what evolved, not only show counts.
+- Research runs should report lineage, diversity, survival, and strategy metrics.
+
+## Design Principles
+
+- **Evolution first**: tune for sustained selection pressure before adding visual polish.
+- **Deterministic by default for experiments**: named scenarios should carry seeds so behavior can be reproduced.
+- **Diversity over single-score optimization**: preserve and expose different viable strategies instead of optimizing one global fitness number.
+- **Inspectable causality**: stats, diagrams, and UI should make it clear why populations grow, crash, split, or stabilize.
+- **Small verified steps**: each iteration should add an observable behavior and a regression check.
+
+## Research Basis
+
+- NEAT shows that evolved controllers become more powerful when structure can grow over time and innovations are protected by speciation. That is a later-stage fit for evo-1 once simpler heritable policies are working. See [Stanley and Miikkulainen, 2002](https://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf).
+- MAP-Elites argues for mapping high-performing individuals across behavioral niches. evo-1 should eventually track elites by traits such as aggression, diet, speed, size, and survival style instead of reporting only one average fitness. See [Mouret and Clune, 2015](https://arxiv.org/abs/1504.04909).
+- Open-ended artificial life research frames the goal as ongoing adaptive novelty and complexity growth, not just stable population counts. evo-1 should measure novelty and diversity as first-class outputs. See [An Overview of Open-Ended Evolution](https://arxiv.org/abs/1909.04430).
+- Lenia is a useful product reference because it turns artificial life into discovery, taxonomy, and interactive exploration. evo-1 should similarly make emergent behavior legible. See [Lenia - Biology of Artificial Life](https://arxiv.org/abs/1812.05433).
+- Browser thread support still depends on cross-origin isolation when `SharedArrayBuffer` is needed. evo-1 should keep documenting and testing COOP/COEP deployment constraints. See [web.dev COOP/COEP guidance](https://web.dev/articles/coop-coep).
+
+## Iteration Roadmap
+
+### 1. Reproducible Ecology Baseline
+
+Goal: every named scenario has a deterministic seed and a regression expectation.
+
+Done in the first vision iteration:
+
+- `SimulationConfig` and `HeadlessConfig` support optional seeds.
+- Scenario scripts pass fixed seeds.
+- Resources regenerate and depleted resources are replenished to a scenario floor.
+- Agent lifespan, starting energy, sensing, and reproduction pressure are tuned so seeded runs can reach later generations without immediate extinction or unbounded growth.
+- Tests assert seeded reproducibility and later-generation survival.
+
+### 2. Meaningful Agent Decisions
+
+Goal: make `Seeking`, `Hunting`, `Feeding`, `Fleeing`, `Fighting`, and `Reproducing` real strategic states.
+
+Done in the second vision iteration:
+
+- Agents build a spatial snapshot of nearby resources and agents before mutating their own state.
+- Stronger nearby threats can trigger `Fleeing`.
+- Predator drive and aggression influence prey targeting, combat risk, and `Fighting`.
+- Eligible agents seek nearby mates before the reproduction system pairs and spawns offspring.
+- `SimulationStats`, headless output, and the browser UI expose current state distribution, predator/prey mix, reproduction candidates, births, and kills.
+- Seeded regression coverage now proves survival, reproduction, later generations, and nonzero combat pressure.
+
+### 3. Heritable Strategy Genome
+
+Goal: evolve behavior, not only physical traits.
+
+Next work:
+
+- Add a compact policy genome that weights food, mates, threats, prey, crowding, energy, and age.
+- Use the policy to choose actions.
+- Mutate policy weights with the existing gene inheritance flow.
+- Report average policy traits and strategy clusters.
+
+### 4. Lineage and Diversity
+
+Goal: make evolution explainable.
+
+Next work:
+
+- Add agent IDs and parent IDs.
+- Track lineage depth, living descendants, and dominant ancestors.
+- Add species or cluster assignment from trait distance.
+- Add diversity metrics and generation histograms.
+
+### 5. Browser Discovery UI
+
+Goal: make the browser app feel like an evolutionary observatory.
+
+Next work:
+
+- Add scenario picker and seed display.
+- Add pause, step, and time-scale controls.
+- Add inspect-agent details for genes, energy, generation, lineage, and state.
+- Add trait overlays, population timeline, and lineage summaries.
+
+### 6. Visual Simulation Backlog
+
+Goal: make the simulation itself interesting to watch while keeping behavior readable.
+
+Backlog:
+
+- Make agents visually distinct from resources. Agents should be directional organisms whose orientation follows velocity; resources should be quieter nutrients or spores.
+- Use behavior states as visible signals: hunting should read as predatory pressure, fleeing as escape motion, feeding as absorption, fighting as impact, and reproducing as a paired or haloed event.
+- Let genes affect silhouette and material treatment. Size, aggression, defense, stealth, speed, and color hue should shape how an organism looks, not only how it moves.
+- Add motion trails and short-lived event pulses for births, deaths, attacks, and resource consumption.
+- Add optional observability overlays for predator/prey pressure, resource density, trait distribution, and lineage/generation.
+- Keep rendering performant enough for large populations by batching entities and effects instead of issuing one draw call per organism.
+- Separate simulation-space coordinates from display-space presentation so full-screen rendering can become sharper without changing ecology rules.
+
+## Technology Direction
+
+Keep the current Rust, WASM, `hecs`, and custom rendering stack while the simulation model is still changing quickly. The browser renderer should prefer WebGPU, with WebGL and Canvas2D retained as compatibility fallbacks. A Bevy migration could be valuable if evo-1 becomes more game-like, but it would slow down the immediate goal: making the ecosystem genuinely interesting.

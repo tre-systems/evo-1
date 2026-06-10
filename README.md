@@ -1,211 +1,119 @@
-# BattleO - Unified Simulation Framework
+# evo-1
 
-A high-performance agent-based simulation framework that supports both headless execution for tuning/evaluation and web browser visualization using the same core simulation logic.
+evo-1 is a Rust evolutionary simulation with two supported runtimes: a native headless runner for experiments and a WebAssembly browser app for interactive visualization.
 
-## 🚀 Features
+It is the first project in the TRE evo series: a selection-field ecology sandbox for watching agents compete, feed, reproduce, and diverge under visible selection pressure.
 
-- **Unified Simulation Core**: Single codebase for both headless and web modes
-- **High-Speed Headless Mode**: Run simulations without graphics for parameter tuning and evaluation
-- **Web Browser Visualization**: Real-time WebGL/Canvas2D rendering in browsers
-- **Dual Engine Support**: ECS (Entity Component System) and Legacy simulation engines
-- **Performance Optimization**: Speed multipliers for rapid iteration
-- **Comprehensive Diagnostics**: Detailed metrics and quality assessment
+## What It Contains
 
-## 🏗️ Architecture
+- ECS-based simulation state using `hecs`.
+- Spatial-grid lookups for nearby agents and resources.
+- Genetic traits, reproduction, resource consumption, death, and predator/prey interactions.
+- Native headless execution with Rayon-enabled resource updates.
+- Browser execution with WebGPU rendering, WebGL/Canvas2D fallbacks, and optional `wasm-bindgen-rayon` worker-pool support.
+- Graphviz architecture diagrams committed as source `.dot` files and rendered PNGs.
 
-The simulation is built around a unified core with three main components:
+## Quick Start
 
-### 1. Simulation Core (`simulation_core.rs`)
+### Prerequisites
 
-- `SimulationEngine` trait for engine abstraction
-- `EcsSimulationEngine`: High-performance ECS-based simulation
-- `LegacySimulationEngine`: Traditional vector-based simulation
-- `UnifiedSimulation`: Dynamic engine selection wrapper
-
-### 2. Headless Simulation (`headless_simulation_v2.rs`)
-
-- `HeadlessSimulationV2`: High-speed, non-graphical simulation runner
-- Configurable speed multipliers for rapid iteration
-- Comprehensive diagnostics and quality metrics
-- Early termination and progress reporting
-
-### 3. Web Simulation (`web_simulation.rs`)
-
-- `WebSimulation`: Browser-based simulation with rendering
-- WebGL and Canvas2D rendering support
-- Real-time visualization and interaction
-- Same simulation core as headless mode
-
-## 📦 Installation
+- Rust stable for native builds and standard checks.
+- `wasm32-unknown-unknown` for the stable WASM check.
+- `nightly-2024-08-02` with `rust-src` for the threaded WASM build.
+- `wasm-pack` `0.13.1` for browser packages.
+- Graphviz for diagram rendering.
 
 ```bash
-git clone <repository>
-cd battleo
-cargo build --release
+rustup target add wasm32-unknown-unknown
+rustup toolchain install nightly-2024-08-02 --component rust-src --target wasm32-unknown-unknown
+cargo install wasm-pack --locked --version 0.13.1
+# Install Graphviz with your package manager; on macOS:
+brew install graphviz
 ```
 
-## 🎯 Usage
-
-### Headless Mode (High-Speed Tuning)
-
-```rust
-use battleo::headless_simulation_v2::{HeadlessSimulationConfig, HeadlessSimulationV2};
-
-// Configure simulation
-let config = HeadlessSimulationConfig {
-    target_duration_minutes: 2.0,    // Run for 2 minutes
-    speed_multiplier: 20.0,          // 20x faster than real-time
-    initial_agents: 100,
-    initial_resources: 200,
-    use_ecs: true,                   // Use ECS engine
-    ..Default::default()
-};
-
-// Run simulation
-let mut simulation = HeadlessSimulationV2::new(config);
-let diagnostics = simulation.run();
-
-// Analyze results
-println!("Duration: {:.2}s", diagnostics.duration_seconds);
-println!("Steps per second: {:.1}", diagnostics.steps_per_second);
-println!("Quality score: {:.3}", diagnostics.simulation_quality_score);
-println!("Final agents: {}", diagnostics.final_stats.agent_count);
-```
-
-### Web Mode (Browser Visualization)
-
-```javascript
-// Initialize simulation
-const simulation = new BattleSimulation("canvas-id");
-
-// Start visualization
-simulation.start();
-
-// Add agents/resources
-simulation.add_agent(100, 100);
-simulation.add_resource(200, 200);
-
-// Get statistics
-const stats = simulation.get_stats();
-console.log("Agent count:", stats.agent_count);
-console.log("Resource count:", stats.resource_count);
-```
-
-### Performance Comparison
-
-```rust
-// Test ECS vs Legacy performance
-let config_ecs = HeadlessSimulationConfig {
-    use_ecs: true,
-    speed_multiplier: 10.0,
-    ..Default::default()
-};
-
-let config_legacy = HeadlessSimulationConfig {
-    use_ecs: false,
-    speed_multiplier: 10.0,
-    ..Default::default()
-};
-
-let mut sim_ecs = HeadlessSimulationV2::new(config_ecs);
-let mut sim_legacy = HeadlessSimulationV2::new(config_legacy);
-
-let diagnostics_ecs = sim_ecs.run();
-let diagnostics_legacy = sim_legacy.run();
-
-println!("ECS performance: {:.1} steps/sec", diagnostics_ecs.steps_per_second);
-println!("Legacy performance: {:.1} steps/sec", diagnostics_legacy.steps_per_second);
-```
-
-## 🔧 Configuration
-
-### HeadlessSimulationConfig
-
-| Parameter                 | Type  | Default | Description                           |
-| ------------------------- | ----- | ------- | ------------------------------------- |
-| `target_duration_minutes` | f64   | 1.0     | Target simulation duration            |
-| `speed_multiplier`        | f64   | 1.0     | Speed multiplier for faster execution |
-| `initial_agents`          | usize | 50      | Initial number of agents              |
-| `initial_resources`       | usize | 100     | Initial number of resources           |
-| `use_ecs`                 | bool  | true    | Use ECS engine (false for legacy)     |
-| `width`                   | f64   | 800.0   | Simulation world width                |
-| `height`                  | f64   | 600.0   | Simulation world height               |
-| `max_agents`              | usize | 1000    | Maximum agents allowed                |
-| `max_resources`           | usize | 500     | Maximum resources allowed             |
-
-### SimulationDiagnostics
-
-The headless simulation provides comprehensive diagnostics:
-
-- **Performance**: Duration, steps per second, total steps
-- **Population**: Final agent/resource counts, energy levels
-- **Quality**: Stability score, extinction detection, population explosion
-- **Evolution**: Generations, reproductions, deaths, fitness metrics
-
-## 🚀 Performance
-
-### Headless Mode
-
-- **Speed**: 10-100x faster than real-time with speed multipliers
-- **Memory**: Optimized for large-scale simulations
-- **Scalability**: Supports thousands of agents efficiently
-
-### Web Mode
-
-- **Rendering**: 60 FPS WebGL/Canvas2D rendering
-- **Interactivity**: Real-time agent/resource addition
-- **Compatibility**: Works in all modern browsers
-
-## 🔄 Workflow
-
-1. **Tune Parameters**: Use headless mode to rapidly test configurations
-2. **Evaluate Performance**: Analyze diagnostics and quality metrics
-3. **Visualize Results**: Use web mode to see the simulation in action
-4. **Iterate**: Refine parameters based on both metrics and visualization
-
-## 📊 Example Results
-
-```
-=== Headless Simulation Results ===
-Duration: 1.23s
-Steps per second: 1,847.3
-Quality score: 0.892
-Final agents: 87
-Final resources: 156
-Stability score: 0.85
-Is stable: true
-Is dynamic: true
-Max generation: 5
-Total reproductions: 23
-Total deaths: 12
-```
-
-## 🛠️ Development
-
-### Building
+### Browser App
 
 ```bash
-# Build library
-cargo build --release
-
-# Build WASM for web
-wasm-pack build --target web
+./scripts/build-wasm.sh
+python3 server.py
 ```
 
-### Testing
+Open `http://127.0.0.1:8000`.
+
+`server.py` binds to `127.0.0.1` and sends the COOP/COEP headers required for `SharedArrayBuffer` and `wasm-bindgen-rayon`.
+
+### Cloudflare Pages
+
+The intended production target is `https://evo-1.tre.systems` on a Cloudflare Pages project named `evo-1`.
+
+Build the deployable static bundle:
 
 ```bash
-# Run all tests
-cargo test
-
-# Run specific test
-cargo test test_headless_simulation_v2
+./scripts/build-pages.sh
 ```
 
-## 📝 License
+Deploy it directly with Wrangler:
 
-[Add your license here]
+```bash
+npx wrangler pages deploy dist --project-name evo-1
+```
 
-## 🤝 Contributing
+For the Pages dashboard/Git integration, use `./scripts/build-pages.sh` as the build command and `dist` as the build output directory.
 
-[Add contribution guidelines here]
+### Headless Runner
+
+```bash
+cargo run --release --locked --bin headless -- 2.0 20 500 500 3000 2000
+```
+
+The positional arguments are:
+
+```text
+duration_minutes speed_multiplier initial_agents initial_resources max_agents max_resources [--seed seed]
+```
+
+Convenience scripts are available:
+
+```bash
+./run_simulation.sh
+./run_simulation.sh 1.0 10 200 200 1000 800 202
+./run_scenarios.sh
+./run_scenarios.sh quick_test
+```
+
+`run_scenarios.sh` is the source of truth for the named scenario catalog. Named scenarios carry fixed seeds so ecology changes can be compared across runs.
+
+## Local Checks
+
+Run the full local check suite before pushing code changes:
+
+```bash
+./scripts/check.sh
+```
+
+It runs formatting, clippy, tests, stable WASM checking, the pinned threaded-WASM check, and Graphviz diagram validation.
+
+Refresh rendered diagrams after editing `.dot` files:
+
+```bash
+node scripts/render-diagrams.mjs
+node scripts/check-diagrams.mjs
+```
+
+## Documentation
+
+- [Architecture and Patterns](docs/implementation.md) - runtime boundaries, module map, frame pipeline, and recurring implementation patterns.
+- [Product Vision](docs/vision.md) - original ambition, research notes, and iteration roadmap.
+- [API Reference](docs/api-reference.md) - public Rust, WASM, and headless interfaces.
+- [Architecture Diagrams](docs/diagrams/README.md) - Graphviz sources, rendered PNGs, conventions, and render commands.
+- [Deployment](docs/deployment.md) - Cloudflare Pages build, headers, and `evo-1.tre.systems` setup.
+- [Maintenance Notes](docs/maintenance.md) - required checks, browser smoke test, and deployment status.
+- [Documentation Index](docs/README.md) - compact docs map.
+
+## Browser Requirements
+
+The browser app needs a modern browser with WebAssembly and WebGPU. It falls back to WebGL or Canvas2D when WebGPU is unavailable. Web Workers and `SharedArrayBuffer` require cross-origin isolation; use `python3 server.py` locally so those headers are present.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).

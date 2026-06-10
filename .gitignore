@@ -1,9 +1,9 @@
 # Rust build artifacts
 target/
-Cargo.lock
 
 # WebAssembly build output
 pkg/
+dist/
 
 # IDE files
 .vscode/
@@ -17,7 +17,9 @@ Thumbs.db
 
 # Logs
 *.log
+.playwright-cli/
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+__pycache__/

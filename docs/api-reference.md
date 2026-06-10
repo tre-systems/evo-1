@@ -1,0 +1,248 @@
+# API Reference
+
+This file documents the public API surfaces that are meant to be used directly. Architecture patterns and ECS internals are documented in [implementation.md](implementation.md).
+
+## Rust Simulation API
+
+```rust
+use evo_1::simulation::{RuntimeCapabilities, Simulation, SimulationConfig};
+
+let config = SimulationConfig {
+    width: 1000.0,
+    height: 800.0,
+    seed: Some(42),
+    ..SimulationConfig::default()
+};
+
+let mut simulation = Simulation::new_with_config_and_capabilities(
+    config,
+    RuntimeCapabilities { parallel_resources: false },
+);
+
+simulation.update();
+let stats = simulation.get_stats();
+```
+
+### `Simulation`
+
+- `Simulation::new() -> Self`
+- `Simulation::new_with_config(config: SimulationConfig) -> Self`
+- `Simulation::new_with_config_and_capabilities(config: SimulationConfig, runtime_capabilities: RuntimeCapabilities) -> Self`
+- `update(&mut self)`
+- `add_agent(&mut self, x: f64, y: f64)`
+- `add_resource(&mut self, x: f64, y: f64)`
+- `reset(&mut self)`
+- `set_runtime_capabilities(&mut self, runtime_capabilities: RuntimeCapabilities)`
+- `runtime_capabilities(&self) -> RuntimeCapabilities`
+- `set_motion_controls(&mut self, smoothness: f64, speed_scale: f64, wander: f64)`
+- `motion_settings(&self) -> MotionSettings`
+- `set_ecology_controls(&mut self, resource_growth_scale: f64, reproduction_scale: f64)`
+- `ecology_settings(&self) -> EcologySettings`
+- `get_stats(&self) -> SimulationStats`
+- `agent_count(&self) -> usize`
+- `resource_count(&self) -> usize`
+- `get_agents(&self) -> Vec<agent::Agent>`
+- `get_resources(&self) -> Vec<resource::Resource>`
+- `get_config(&self) -> &SimulationConfig`
+
+### `SimulationConfig`
+
+```rust
+pub struct SimulationConfig {
+    pub width: f64,
+    pub height: f64,
+    pub max_agents: usize,
+    pub max_resources: usize,
+    pub initial_agents: usize,
+    pub initial_resources: usize,
+    pub seed: Option<u64>,
+    pub motion: MotionSettings,
+    pub ecology: EcologySettings,
+}
+```
+
+Initial counts are clamped to the max counts when the ECS world is created or reset.
+When `seed` is set, initial placement, random movement, inheritance, reproduction pairing, and resource spawning are reproducible for the same update sequence.
+
+### `MotionSettings`
+
+Exported as `evo_1::ecs::MotionSettings`.
+
+```rust
+pub struct MotionSettings {
+    pub smoothness: f64,
+    pub speed_scale: f64,
+    pub wander: f64,
+}
+```
+
+Motion settings are normalized before use. `smoothness` and `wander` are clamped to `0.0..=1.0`; `speed_scale` is clamped to `0.25..=2.4`. A `smoothness` value of `0.5` now matches the previous maximum smoothing response, with values above `0.5` adding extra damping.
+
+### `EcologySettings`
+
+Exported as `evo_1::simulation::EcologySettings`.
+
+```rust
+pub struct EcologySettings {
+    pub resource_growth_scale: f64,
+    pub reproduction_scale: f64,
+}
+```
+
+Ecology settings are normalized before use. Both fields are clamped to `0.25..=2.5`.
+
+### `RuntimeCapabilities`
+
+```rust
+pub struct RuntimeCapabilities {
+    pub parallel_resources: bool,
+}
+```
+
+Native headless runs enable `parallel_resources` after initializing Rayon. Browser runs enable it only after `ParallelProcessor.initialize()` reports that the WASM worker pool is ready.
+
+### `SimulationStats`
+
+```rust
+pub struct SimulationStats {
+    pub agent_count: usize,
+    pub resource_count: usize,
+    pub total_energy: f64,
+    pub average_age: f64,
+    pub average_speed: f64,
+    pub average_size: f64,
+    pub average_aggression: f64,
+    pub average_sense_range: f64,
+    pub average_energy_efficiency: f64,
+    pub max_generation: u32,
+    pub total_kills: u32,
+    pub average_fitness: f64,
+    pub seeking_agents: usize,
+    pub hunting_agents: usize,
+    pub feeding_agents: usize,
+    pub fleeing_agents: usize,
+    pub fighting_agents: usize,
+    pub reproducing_agents: usize,
+    pub predator_agents: usize,
+    pub prey_agents: usize,
+    pub reproduction_candidates: usize,
+    pub total_resource_energy: f64,
+    pub average_resource_energy: f64,
+    pub resources_being_consumed: usize,
+    pub consumption_events_this_frame: usize,
+    pub total_consumption_events: usize,
+    pub birth_events_this_frame: usize,
+    pub death_events_this_frame: usize,
+    pub kill_events_this_frame: usize,
+    pub total_birth_events: usize,
+    pub total_death_events: usize,
+    pub average_agent_energy: f64,
+    pub agents_with_targets: usize,
+}
+```
+
+The behavior fields are committed-frame snapshot counts derived from live agent state, not transition counters. `predator_agents` uses the current `is_predator >= 0.5` trait threshold; `prey_agents` is the remaining live population. `reproduction_candidates` uses the same energy, age, and cooldown eligibility rule as the reproduction system before mate pairing and probability checks.
+
+Event counters come from the per-frame `FrameEvent` ledger in `EcsWorld`.
+
+## Browser WASM API
+
+`index.html` imports these from `pkg/evo_1.js`, generated by `./scripts/build-wasm.sh`. The package is named `evo-1`; Rust and generated WASM import paths use `evo_1`.
+
+```javascript
+import init, { createEvoOneSimulation, ParallelProcessor } from "./pkg/evo_1.js";
+
+await init();
+
+const simulation = await createEvoOneSimulation("canvas");
+const processor = new ParallelProcessor();
+
+await processor.initialize();
+simulation.set_parallel_resources_enabled(processor.is_rayon_available());
+
+simulation.update();
+console.log(simulation.get_stats());
+```
+
+### `EvoOneSimulation`
+
+- `createEvoOneSimulation(canvas_id?: string) -> Promise<EvoOneSimulation>`
+- `new(canvas_id?: string) -> EvoOneSimulation`
+- `update()`
+- `get_stats() -> object`
+- `add_agent(x: number, y: number)`
+- `add_resource(x: number, y: number)`
+- `reset()`
+- `get_rendering_mode() -> string`
+- `set_parallel_resources_enabled(enabled: boolean)`
+- `is_parallel_resources_enabled() -> boolean`
+- `set_motion_controls(smoothness: number, speedScale: number, wander: number)`
+- `set_ecology_controls(resourceGrowthScale: number, reproductionScale: number)`
+
+Use `createEvoOneSimulation` for the browser UI because WebGPU device setup is asynchronous. The synchronous constructor is retained as a compatibility fallback path and initializes the WebGL/Canvas2D renderer.
+
+### `ParallelProcessor`
+
+- `new() -> ParallelProcessor`
+- `initialize() -> Promise`
+- `is_initialized() -> boolean`
+- `get_worker_count() -> number`
+- `is_rayon_available() -> boolean`
+
+`initialize()` is idempotent. The browser UI disables its initialization button after a successful worker-pool setup.
+
+## Native Headless API
+
+Use the binary for normal runs:
+
+```bash
+cargo run --release --locked --bin headless -- 2.0 20 500 500 3000 2000
+cargo run --release --locked --bin headless -- 0.1 20 100 200 500 500 --seed 42
+```
+
+Use the library runner for Rust callers:
+
+```rust
+use evo_1::headless::{HeadlessConfig, HeadlessSimulation};
+
+let config = HeadlessConfig::default();
+let mut simulation = HeadlessSimulation::new(config);
+let diagnostics = simulation.run();
+```
+
+### `HeadlessConfig`
+
+```rust
+pub struct HeadlessConfig {
+    pub duration_minutes: f64,
+    pub speed_multiplier: f64,
+    pub initial_agents: usize,
+    pub initial_resources: usize,
+    pub max_agents: usize,
+    pub max_resources: usize,
+    pub seed: Option<u64>,
+}
+```
+
+### `SimulationDiagnostics`
+
+```rust
+pub struct SimulationDiagnostics {
+    pub duration_seconds: f64,
+    pub total_steps: usize,
+    pub steps_per_second: f64,
+    pub final_stats: SimulationStats,
+    pub stability_score: f64,
+    pub is_stable: bool,
+    pub extinction_occurred: bool,
+    pub population_explosion: bool,
+    pub average_generations: f64,
+    pub total_reproductions: usize,
+    pub total_deaths: usize,
+    pub simulation_quality_score: f64,
+}
+```
+
+## Snapshot DTOs
+
+`agent::Agent` and `resource::Resource` are read-only snapshot DTOs used by rendering and external API callers. New simulation behavior should use ECS components, not these DTOs.

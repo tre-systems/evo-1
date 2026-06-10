@@ -1,285 +1,419 @@
+#[cfg(target_arch = "wasm32")]
+use std::{cell::Cell, rc::Rc};
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+// Core simulation modules (shared between headless and web)
 pub mod agent;
 pub mod ecs;
 pub mod genes;
-pub mod headless_simulation;
 pub mod resource;
-pub mod simulation_core;
-pub mod web_simulation;
-pub mod webgl_renderer;
+pub mod simulation;
 
+// Rendering modules (web only)
+#[cfg(target_arch = "wasm32")]
+pub mod renderer;
+
+// Headless simulation (native only)
+#[cfg(not(target_arch = "wasm32"))]
+pub mod headless;
+
+// ============================================================================
+// CORE SIMULATION (Shared between headless and web)
+// ============================================================================
+
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub struct BattleSimulation {
-    web_simulation: web_simulation::WebSimulation,
+pub struct EvoOneSimulation {
+    simulation: simulation::Simulation,
+    #[wasm_bindgen(skip)]
+    renderer: Option<renderer::WebRenderer>,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-impl BattleSimulation {
+impl EvoOneSimulation {
     #[wasm_bindgen(constructor)]
-    pub fn new(canvas_id: &str) -> Result<BattleSimulation, JsValue> {
+    pub fn new(canvas_id: Option<String>) -> Result<EvoOneSimulation, JsValue> {
         console_error_panic_hook::set_once();
 
-        let web_simulation = web_simulation::WebSimulation::new(canvas_id)?;
+        let simulation = simulation::Simulation::new();
 
-        Ok(BattleSimulation { web_simulation })
+        let renderer = if let Some(canvas_id) = canvas_id {
+            Some(renderer::WebRenderer::new_fallback(&canvas_id)?)
+        } else {
+            None
+        };
+
+        Ok(EvoOneSimulation {
+            simulation,
+            renderer,
+        })
     }
 
-    pub fn start(&mut self) {
-        self.web_simulation.start();
-    }
+    pub fn update(&mut self) {
+        self.simulation.update();
 
-    pub fn stop(&mut self) {
-        self.web_simulation.stop();
-    }
-
-    pub fn step(&mut self) {
-        self.web_simulation.step();
+        if let Some(renderer) = &mut self.renderer {
+            renderer.render(&self.simulation);
+        }
     }
 
     pub fn get_stats(&self) -> JsValue {
-        self.web_simulation.get_stats()
-    }
-
-    pub fn get_rendering_mode(&self) -> String {
-        self.web_simulation.get_rendering_mode()
-    }
-
-    pub fn is_rayon_available(&self) -> bool {
-        self.web_simulation.is_rayon_available()
-    }
-
-    pub fn set_rayon_initialized(&self, initialized: bool) {
-        self.web_simulation.set_rayon_initialized(initialized);
-    }
-
-    pub fn force_webgl(&mut self) -> bool {
-        self.web_simulation.force_webgl()
+        serde_wasm_bindgen::to_value(&self.simulation.get_stats()).unwrap_or_else(|error| {
+            web_sys::console::error_1(&format!("Failed to serialize stats: {error}").into());
+            JsValue::NULL
+        })
     }
 
     pub fn add_agent(&mut self, x: f64, y: f64) {
-        self.web_simulation.add_agent(x, y);
+        self.simulation.add_agent(x, y);
     }
 
     pub fn add_resource(&mut self, x: f64, y: f64) {
-        self.web_simulation.add_resource(x, y);
+        self.simulation.add_resource(x, y);
     }
 
     pub fn reset(&mut self) {
-        self.web_simulation.reset();
+        self.simulation.reset();
     }
 
-    pub fn animate(&mut self) {
-        self.web_simulation.animate();
+    pub fn get_rendering_mode(&self) -> String {
+        if let Some(renderer) = &self.renderer {
+            renderer.get_rendering_mode()
+        } else {
+            "No rendering (headless)".to_string()
+        }
+    }
+
+    pub fn set_parallel_resources_enabled(&mut self, enabled: bool) {
+        self.simulation
+            .set_runtime_capabilities(simulation::RuntimeCapabilities {
+                parallel_resources: enabled,
+            });
+    }
+
+    pub fn is_parallel_resources_enabled(&self) -> bool {
+        self.simulation.runtime_capabilities().parallel_resources
+    }
+
+    pub fn set_motion_controls(&mut self, smoothness: f64, speed_scale: f64, wander: f64) {
+        self.simulation
+            .set_motion_controls(smoothness, speed_scale, wander);
+    }
+
+    pub fn set_ecology_controls(&mut self, resource_growth_scale: f64, reproduction_scale: f64) {
+        self.simulation
+            .set_ecology_controls(resource_growth_scale, reproduction_scale);
     }
 }
 
-#[wasm_bindgen]
-pub fn init_panic_hook() {
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = createEvoOneSimulation)]
+pub async fn create_evo_one_simulation(
+    canvas_id: Option<String>,
+) -> Result<EvoOneSimulation, JsValue> {
     console_error_panic_hook::set_once();
+
+    let simulation = simulation::Simulation::new();
+    let renderer = if let Some(canvas_id) = canvas_id {
+        Some(renderer::WebRenderer::new(&canvas_id).await?)
+    } else {
+        None
+    };
+
+    Ok(EvoOneSimulation {
+        simulation,
+        renderer,
+    })
 }
 
-#[wasm_bindgen]
-// Removed init_rayon_pool function - using ParallelProcessor instead
+// ============================================================================
+// PARALLEL PROCESSING (WASM with wasm-bindgen-rayon, native with rayon)
+// ============================================================================
+
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub struct ParallelProcessor {
     initialized: bool,
     worker_count: usize,
+    available: Rc<Cell<bool>>,
     #[wasm_bindgen(skip)]
-    _closure: Option<Closure<dyn FnMut(JsValue)>>,
+    #[allow(dead_code)]
+    closure: Option<wasm_bindgen::closure::Closure<dyn FnMut(JsValue)>>,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 impl ParallelProcessor {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        let worker_count = 1;
+        let worker_count = get_optimal_worker_count();
+
         Self {
             initialized: false,
             worker_count,
-            _closure: None,
+            available: Rc::new(Cell::new(false)),
+            closure: None,
         }
     }
 
     pub fn initialize(&mut self) -> js_sys::Promise {
+        if self.initialized {
+            return js_sys::Promise::resolve(&JsValue::from_bool(self.available.get()));
+        }
+
         #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
         {
-            #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
+            use wasm_bindgen::closure::Closure;
             use wasm_bindgen_rayon::init_thread_pool;
 
             web_sys::console::log_1(
                 &format!(
-                    "Starting Rayon initialization with {} workers",
+                    "Initializing WASM thread pool with {} workers",
                     self.worker_count
                 )
                 .into(),
             );
 
-            // Check if already initialized
-            if self.initialized {
-                web_sys::console::warn_1(&"Thread pool already initialized".into());
-                // ecs_simulation::EcsSimulation::set_rayon_initialized(true); // This line was removed
-                return js_sys::Promise::resolve(&wasm_bindgen::JsValue::NULL);
-            }
+            let worker_count = self.worker_count;
+            let available = self.available.clone();
+            let closure = Closure::wrap(Box::new(move |result: JsValue| {
+                web_sys::console::log_1(&format!("Thread pool init result: {:?}", result).into());
+                available.set(true);
+                web_sys::console::log_1(
+                    &format!("WASM thread pool initialized with {worker_count} workers").into(),
+                );
+            }) as Box<dyn FnMut(JsValue)>);
 
-            {
-                let worker_count = self.worker_count;
-                let closure = Closure::wrap(Box::new(move |result: JsValue| {
-                    web_sys::console::log_1(
-                        &format!("Rayon initialization callback received: {:?}", result).into(),
-                    );
-                    match result.as_f64() {
-                        Some(_) => {
-                            // ecs_simulation::EcsSimulation::set_rayon_initialized(true); // This line was removed
-                            web_sys::console::log_1(
-                                &format!("Thread pool initialized with {} workers", worker_count)
-                                    .into(),
-                            );
-                        }
-                        None => {
-                            // ecs_simulation::EcsSimulation::set_rayon_initialized(false); // This line was removed
-                            web_sys::console::log_1(
-                                &format!("Failed to initialize thread pool - SharedArrayBuffer may not be available").into(),
-                            );
-                        }
-                    }
-                }) as Box<dyn FnMut(JsValue)>);
-
-                // Store the closure in the struct to prevent it from being dropped
-                self._closure = Some(closure);
-
-                // Get a reference to the stored closure
-                let closure_ref = self._closure.as_ref().unwrap();
-
-                // Create the promise with the stored closure
-                let promise = init_thread_pool(self.worker_count).then(closure_ref);
-
-                // Mark as initialized to prevent recursive calls
-                self.initialized = true;
-
-                promise
-            }
-        }
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
-        {
-            // For non-WASM targets, simulate initialization
+            self.closure = Some(closure);
             self.initialized = true;
-            let promise = js_sys::Promise::resolve(&wasm_bindgen::JsValue::NULL);
-            promise
-        }
-    }
-
-    pub fn initialize_fallback(&mut self) -> js_sys::Promise {
-        // Fallback initialization that works without SharedArrayBuffer
-        web_sys::console::warn_1(&"Using fallback mode - SharedArrayBuffer not available".into());
-        self.initialized = true;
-        // ecs_simulation::EcsSimulation::set_rayon_initialized(false); // This line was removed
-        let promise = js_sys::Promise::resolve(&wasm_bindgen::JsValue::NULL);
-        promise
-    }
-
-    pub fn parallel_sum(&self, data: Vec<f64>) -> f64 {
-        if !self.initialized {
-            web_sys::console::warn_1(&"Thread pool not initialized, using sequential".into());
-            return data.iter().sum();
-        }
-
-        #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().sum()
+            if let Some(callback) = self.closure.as_ref() {
+                init_thread_pool(self.worker_count).then(callback)
+            } else {
+                js_sys::Promise::reject(&"Thread pool callback was not retained".into())
+            }
         }
 
         #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
         {
-            use rayon::prelude::*;
-            data.par_iter().sum()
+            self.initialized = false;
+            self.available.set(false);
+            web_sys::console::warn_1(
+                &"Threaded WASM support was not compiled into this package".into(),
+            );
+            js_sys::Promise::resolve(&JsValue::FALSE)
         }
     }
 
-    pub fn parallel_map(&self, data: Vec<f64>) -> Vec<f64> {
-        if !self.initialized {
-            return data.iter().map(|x| x * 2.0).collect();
-        }
-
-        #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().map(|x| x * 2.0).collect()
-        }
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().map(|x| x * 2.0).collect()
-        }
-    }
-
-    pub fn complex_parallel_operation(&self, data: Vec<f64>) -> f64 {
-        if !self.initialized {
-            return data.iter().map(|x| x.powi(2)).sum::<f64>().sqrt();
-        }
-
-        #[cfg(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon"))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().map(|x| x.powi(2)).sum::<f64>().sqrt()
-        }
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "wasm-bindgen-rayon")))]
-        {
-            use rayon::prelude::*;
-            data.par_iter().map(|x| x.powi(2)).sum::<f64>().sqrt()
-        }
+    pub fn is_initialized(&self) -> bool {
+        self.initialized
     }
 
     pub fn get_worker_count(&self) -> usize {
         self.worker_count
     }
 
-    pub fn is_initialized(&self) -> bool {
-        self.initialized
+    pub fn is_rayon_available(&self) -> bool {
+        self.available.get()
     }
 }
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+#[cfg(target_arch = "wasm32")]
+fn get_optimal_worker_count() -> usize {
+    let cores = web_sys::window()
+        .map(|window| window.navigator().hardware_concurrency() as usize)
+        .unwrap_or(2);
+
+    cores.clamp(1, 8)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
+// ============================================================================
+// HEADLESS SIMULATION (Native only)
+// ============================================================================
+
+#[cfg(not(target_arch = "wasm32"))]
+pub struct HeadlessSimulation {
+    inner: headless::HeadlessSimulation,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl HeadlessSimulation {
+    pub fn new(config: headless::HeadlessConfig) -> Self {
+        Self {
+            inner: headless::HeadlessSimulation::new(config),
+        }
+    }
+
+    pub fn run(&mut self) -> headless::SimulationDiagnostics {
+        self.inner.run()
+    }
+
+    pub fn get_current_stats(&self) -> simulation::SimulationStats {
+        self.inner.get_current_stats()
+    }
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_headless_simulation_v2() {
-        use crate::headless_simulation::{HeadlessSimulationConfig, HeadlessSimulationV2};
+    fn test_simulation_basic() {
+        let mut sim = simulation::Simulation::new();
 
-        println!("=== Testing Headless Simulation V2 ===");
+        // Add some agents and resources
+        sim.add_agent(100.0, 100.0);
+        sim.add_agent(200.0, 200.0);
+        sim.add_resource(150.0, 150.0);
 
-        let config = HeadlessSimulationConfig {
-            target_duration_minutes: 0.1, // Very short test
-            speed_multiplier: 10.0,       // 10x faster
-            initial_agents: 10,
-            initial_resources: 20,
-            use_ecs: true,
-            ..Default::default()
+        // Run a few steps
+        for _ in 0..100 {
+            sim.update();
+        }
+
+        let stats = sim.get_stats();
+        assert!(stats.agent_count > 0);
+        assert!(stats.resource_count > 0);
+    }
+
+    #[test]
+    fn test_simulation_config_controls_initial_population() {
+        let config = simulation::SimulationConfig {
+            initial_agents: 12,
+            initial_resources: 34,
+            max_agents: 20,
+            max_resources: 40,
+            ..simulation::SimulationConfig::default()
         };
 
-        let mut simulation = HeadlessSimulationV2::new(config);
-        let diagnostics = simulation.run();
+        let sim = simulation::Simulation::new_with_config(config);
+        let stats = sim.get_stats();
 
-        println!("Test completed!");
-        println!("Duration: {:.2}s", diagnostics.duration_seconds);
-        println!("Final agents: {}", diagnostics.final_stats.agent_count);
-        println!(
-            "Final resources: {}",
-            diagnostics.final_stats.resource_count
+        assert_eq!(stats.agent_count, 12);
+        assert_eq!(stats.resource_count, 34);
+    }
+
+    #[test]
+    fn test_seeded_runs_are_reproducible() {
+        let first = run_seeded_scenario(42, 240);
+        let second = run_seeded_scenario(42, 240);
+
+        assert_eq!(first.agent_count, second.agent_count);
+        assert_eq!(first.resource_count, second.resource_count);
+        assert_eq!(first.max_generation, second.max_generation);
+        assert_eq!(first.total_kills, second.total_kills);
+        assert_eq!(first.total_birth_events, second.total_birth_events);
+        assert_eq!(first.total_death_events, second.total_death_events);
+        assert_eq!(first.hunting_agents, second.hunting_agents);
+        assert_eq!(first.fleeing_agents, second.fleeing_agents);
+        assert_eq!(first.reproducing_agents, second.reproducing_agents);
+        assert_eq!(first.predator_agents, second.predator_agents);
+        assert_eq!(
+            first.reproduction_candidates,
+            second.reproduction_candidates
         );
-        println!("Quality score: {:.3}", diagnostics.simulation_quality_score);
-        println!("Steps per second: {:.1}", diagnostics.steps_per_second);
+        assert_eq!(
+            first.average_speed.to_bits(),
+            second.average_speed.to_bits()
+        );
+        assert_eq!(
+            first.average_energy_efficiency.to_bits(),
+            second.average_energy_efficiency.to_bits()
+        );
+    }
 
-        // Basic assertions
-        assert!(diagnostics.duration_seconds > 0.0);
-        assert!(diagnostics.total_steps > 0);
-        assert!(diagnostics.steps_per_second > 0.0);
+    #[test]
+    fn test_seeded_ecology_reaches_later_generations() {
+        let stats = run_seeded_scenario(7, 720);
 
-        println!("Headless Simulation V2 test passed!");
+        assert!(stats.agent_count > 0);
+        assert!(stats.agent_count <= 90);
+        assert!(stats.max_generation >= 3);
+        assert!(stats.total_birth_events > 0);
+        assert_eq!(stats.resource_count, 100);
+    }
+
+    #[test]
+    fn test_seeded_battle_scenario_records_combat_pressure() {
+        let stats = run_seeded_battle_scenario(101, 720);
+
+        let state_count = stats.seeking_agents
+            + stats.hunting_agents
+            + stats.feeding_agents
+            + stats.fleeing_agents
+            + stats.fighting_agents
+            + stats.reproducing_agents;
+
+        assert!(stats.agent_count > 0);
+        assert_eq!(stats.resource_count, 100);
+        assert_eq!(state_count, stats.agent_count);
+        assert!(stats.total_birth_events > 0);
+        assert!(stats.total_kills > 0);
+        assert!(stats.max_generation >= 2);
+        assert!(stats.predator_agents > 0);
+        assert!(stats.prey_agents > 0);
+        assert!(stats.hunting_agents + stats.fighting_agents > 0);
+        assert!(stats.fleeing_agents > 0);
+    }
+
+    fn run_seeded_scenario(seed: u64, steps: usize) -> simulation::SimulationStats {
+        let config = simulation::SimulationConfig {
+            initial_agents: 50,
+            initial_resources: 100,
+            max_agents: 150,
+            max_resources: 150,
+            seed: Some(seed),
+            ..simulation::SimulationConfig::default()
+        };
+        let mut sim = simulation::Simulation::new_with_config(config);
+
+        for _ in 0..steps {
+            sim.update();
+        }
+
+        sim.get_stats()
+    }
+
+    fn run_seeded_battle_scenario(seed: u64, steps: usize) -> simulation::SimulationStats {
+        let config = simulation::SimulationConfig {
+            initial_agents: 100,
+            initial_resources: 100,
+            max_agents: 500,
+            max_resources: 500,
+            seed: Some(seed),
+            ..simulation::SimulationConfig::default()
+        };
+        let mut sim = simulation::Simulation::new_with_config(config);
+
+        for _ in 0..steps {
+            sim.update();
+        }
+
+        sim.get_stats()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    #[test]
+    fn test_parallel_processing() {
+        let mut processor = ParallelProcessor::new();
+        let _ = processor.initialize();
+
+        // Test that rayon is available after initialization
+        assert!(processor.is_rayon_available() || !processor.is_initialized());
     }
 }

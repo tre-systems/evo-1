@@ -1,0 +1,118 @@
+digraph EvoOneFramePipeline {
+  graph [
+    rankdir=LR,
+    bgcolor="#ffffff",
+    pad="0.55",
+    nodesep="0.48",
+    ranksep="0.72",
+    splines=polyline,
+    outputorder=edgesfirst,
+    compound=true,
+    newrank=true,
+    forcelabels=true,
+    fontname="Avenir",
+    label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
+        <TR><TD><FONT POINT-SIZE="34"><B>Simulation Frame Pipeline</B></FONT></TD></TR>
+      </TABLE>
+    >,
+    labelloc=t,
+    labeljust=c
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    margin="0.21,0.13",
+    width=2.72,
+    height=0.72,
+    fixedsize=false,
+    fontname="Avenir",
+    fontsize=18,
+    penwidth=2.4,
+    fontcolor="#14213d",
+    color="#2264c7",
+    fillcolor="#eaf3ff:#ffffff",
+    gradientangle=270
+  ];
+
+  edge [
+    color="#263a59",
+    fontname="Avenir",
+    fontsize=13,
+    fontcolor="#3d4a5c",
+    penwidth=2.2,
+    arrowsize=0.78
+  ];
+
+  start [label=<<B>Simulation::update</B><BR/><FONT POINT-SIZE="15">delta time and timers</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  event_start [label=<<B>Begin frame ledger</B><BR/><FONT POINT-SIZE="15">clear per-frame events</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  grid [label=<<B>Refresh SpatialGrid</B><BR/><FONT POINT-SIZE="15">one rebuild per frame</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  rayon [label=<<B>parallel_resources?</B>>, shape=diamond, style=filled, width=2.25, height=1.05, fillcolor="#ffffff", color="#1f2f46", penwidth=2.4];
+
+  subgraph cluster_resource_parallel {
+    graph [
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" COLOR="#d39a00"><B>TWO-PHASE RESOURCE UPDATE</B></FONT></TD></TR>
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12" COLOR="#8a6500">Parallel work uses cloneable snapshots, then applies results sequentially.</FONT></TD></TR>
+        </TABLE>
+      >,
+      labelloc=t,
+      labeljust=l,
+      color="#f3d278",
+      fillcolor="#fffaf0",
+      style="rounded,filled",
+      penwidth=1.8,
+      margin=20
+    ];
+
+    collect_resources [label=<<B>Collect resources</B><BR/><FONT POINT-SIZE="15">entity id + cloned component</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    compute_resources [label=<<B>Parallel compute</B><BR/><FONT POINT-SIZE="15">Resource::update via rayon</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    apply_resources [label=<<B>Apply results</B><BR/><FONT POINT-SIZE="15">sequential ECS mutation</FONT>>, fillcolor="#d8f5de:#effcf2", color="#15803d", penwidth=3.0];
+
+    collect_resources -> compute_resources -> apply_resources;
+  }
+
+  resource_seq [label=<<B>Sequential resource update</B><BR/><FONT POINT-SIZE="15">query_mut pass</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  consumption [label=<<B>Spatial consumption</B><BR/><FONT POINT-SIZE="15">resources and predator/prey events</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+
+  subgraph cluster_agents {
+    graph [
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" COLOR="#1e6b43"><B>SPATIAL AGENT UPDATE</B></FONT></TD></TR>
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12" COLOR="#4e7a61">Agents use the spatial grid instead of broad all-pairs scans.</FONT></TD></TR>
+        </TABLE>
+      >,
+      labelloc=t,
+      labeljust=l,
+      color="#b8e5c8",
+      fillcolor="#f4fbf6",
+      style="rounded,filled",
+      penwidth=1.8,
+      margin=20
+    ];
+
+    collect_agents [label=<<B>Collect agent IDs</B><BR/><FONT POINT-SIZE="15">marker-tag filtered entities</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    update_agents [label=<<B>update_single_agent_optimized</B><BR/><FONT POINT-SIZE="15">decision states, movement, energy</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    nearby [label=<<B>Nearby snapshots</B><BR/><FONT POINT-SIZE="15">food, threats, prey, mates</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+
+    collect_agents -> update_agents -> nearby [style=dashed, label="lookup", color="#6b7280", fontcolor="#6b7280"];
+  }
+
+  death [label=<<B>Handle death</B><BR/><FONT POINT-SIZE="15">despawn and record deaths</FONT>>, fillcolor="#fff1f2:#ffffff", color="#dc2626"];
+  reproduction [label=<<B>Handle reproduction</B><BR/><FONT POINT-SIZE="15">spawn and record births</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  depletion [label=<<B>Remove depleted resources</B><BR/><FONT POINT-SIZE="15">despawn zero-energy resources</FONT>>, fillcolor="#fff1f2:#ffffff", color="#dc2626"];
+  replenish [label=<<B>Replenish resources</B><BR/><FONT POINT-SIZE="15">maintain scenario floor</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+  end [label=<<B>Committed frame state</B><BR/><FONT POINT-SIZE="15">ready for stats or rendering</FONT>>, fillcolor="#d8f5de:#effcf2", color="#15803d", penwidth=3.0];
+
+  start -> event_start -> grid -> rayon;
+  rayon -> collect_resources [label="yes", lhead=cluster_resource_parallel];
+  rayon -> resource_seq [label="no"];
+  apply_resources -> consumption [ltail=cluster_resource_parallel];
+  resource_seq -> consumption;
+  consumption -> collect_agents [lhead=cluster_agents];
+  nearby -> death [ltail=cluster_agents];
+  death -> reproduction -> depletion -> replenish -> end;
+}

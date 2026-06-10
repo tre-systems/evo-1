@@ -3,514 +3,918 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Battleo - Evolutionary Battle Simulation</title>
+    <meta
+      http-equiv="Cache-Control"
+      content="no-cache, no-store, must-revalidate"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="icon" href="data:," />
+    <title>evo-1 - Evolutionary Simulation</title>
     <style>
+      :root {
+        color-scheme: dark;
+        --bg: #090a0f;
+        --panel: rgba(4, 8, 13, 0.5);
+        --panel-strong: rgba(7, 12, 18, 0.72);
+        --panel-soft: rgba(247, 239, 213, 0.045);
+        --text: #f7efd5;
+        --muted: rgba(247, 239, 213, 0.68);
+        --faint: rgba(247, 239, 213, 0.46);
+        --cyan: #55d7e6;
+        --gold: #b9874f;
+        --green: #65d488;
+        --red: #f06f6f;
+        --border: rgba(247, 239, 213, 0.2);
+        --shadow: 0 24px 84px rgba(0, 0, 0, 0.42);
+      }
+
       * {
-        margin: 0;
-        padding: 0;
         box-sizing: border-box;
       }
 
+      html,
       body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background: #0f0f23;
-        color: #ffffff;
-        overflow: hidden;
-        height: 100vh;
-      }
-
-      .container {
-        width: 100vw;
-        height: 100vh;
-        position: relative;
-        background: radial-gradient(
-          ellipse at center,
-          rgba(26, 26, 46, 0.8) 0%,
-          rgba(15, 15, 35, 0.95) 100%
-        );
-      }
-
-      .stats-overlay {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        background: rgba(15, 15, 35, 0.85);
-        backdrop-filter: blur(15px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-        padding: 16px;
-        z-index: 1000;
-        min-width: 200px;
-        box-shadow:
-          0 8px 32px rgba(0, 0, 0, 0.4),
-          0 0 0 1px rgba(255, 255, 255, 0.05);
-        transition: all 0.3s ease;
-        opacity: 0;
-        pointer-events: none;
-        transform: translateX(100%);
-      }
-
-      .stats-overlay.visible {
-        opacity: 1;
-        pointer-events: all;
-        transform: translateX(0);
-      }
-
-      .stats-toggle {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        width: 40px;
-        height: 40px;
-        background: rgba(78, 205, 196, 0.2);
-        border: 1px solid rgba(78, 205, 196, 0.3);
-        border-radius: 50%;
-        cursor: pointer;
-        z-index: 1001;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(5px);
-        transition: all 0.3s ease;
-        font-size: 16px;
-        color: rgba(78, 205, 196, 0.8);
-      }
-
-      .stats-toggle:hover {
-        background: rgba(78, 205, 196, 0.3);
-        border-color: rgba(78, 205, 196, 0.5);
-        color: rgba(78, 205, 196, 1);
-        transform: scale(1.1);
-      }
-
-      .stats-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      }
-
-      .stats-title {
-        display: flex;
-        align-items: center;
-      }
-
-      .restart-btn {
-        background: rgba(255, 107, 107, 0.15);
-        color: rgba(255, 107, 107, 0.9);
-        border: 1px solid rgba(255, 107, 107, 0.25);
-        border-radius: 6px;
-        padding: 6px 10px;
-        cursor: pointer;
-        font-size: 0.7em;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(5px);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .restart-btn:hover {
-        background: rgba(255, 107, 107, 0.25);
-        border-color: rgba(255, 107, 107, 0.4);
-        color: rgba(255, 107, 107, 1);
-        transform: translateY(-1px);
-      }
-
-      .minimize-btn {
-        background: rgba(255, 255, 255, 0.08);
-        color: rgba(255, 255, 255, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 6px;
-        padding: 6px;
-        cursor: pointer;
-        font-size: 0.7em;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        margin-left: 6px;
-        backdrop-filter: blur(5px);
-        width: 24px;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .minimize-btn:hover {
-        background: rgba(255, 255, 255, 0.15);
-        color: rgba(255, 255, 255, 0.8);
-        border-color: rgba(255, 255, 255, 0.25);
-        transform: translateY(-1px);
-      }
-
-      .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-      }
-
-      .stat-item {
-        text-align: left;
-        padding: 6px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      }
-
-      .stat-item:last-child {
-        border-bottom: none;
-      }
-
-      .stat-item .label {
-        font-size: 0.55em;
-        color: rgba(160, 160, 160, 0.8);
-        margin-bottom: 2px;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        font-weight: 600;
-      }
-
-      .stat-item .value {
-        font-size: 1.1em;
-        font-weight: 700;
-        color: #4ecdc4;
-        line-height: 1.1;
-        text-shadow: 0 0 8px rgba(78, 205, 196, 0.3);
-      }
-
-      .stat-item.full-width {
-        grid-column: 1 / -1;
-        text-align: center;
-        padding: 10px 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-        margin-top: 8px;
-        background: rgba(78, 205, 196, 0.05);
-        border-radius: 6px;
-        margin-left: -4px;
-        margin-right: -4px;
-        padding-left: 4px;
-        padding-right: 4px;
-      }
-
-      .stat-item.full-width .value {
-        font-size: 1.3em;
-        text-shadow: 0 0 12px rgba(78, 205, 196, 0.4);
-      }
-
-      .status-indicator {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #4ecdc4;
-        margin-right: 8px;
-        animation: pulse 2s infinite;
-      }
-
-      @keyframes pulse {
-        0% {
-          box-shadow: 0 0 0 0 rgba(78, 205, 196, 0.7);
-        }
-        70% {
-          box-shadow: 0 0 0 10px rgba(78, 205, 196, 0);
-        }
-        100% {
-          box-shadow: 0 0 0 0 rgba(78, 205, 196, 0);
-        }
-      }
-
-      @keyframes gradient {
-        0% {
-          background-position: 0% 50%;
-        }
-        50% {
-          background-position: 100% 50%;
-        }
-        100% {
-          background-position: 0% 50%;
-        }
-      }
-
-      #simulation-canvas {
         width: 100%;
         height: 100%;
-        display: block;
-        cursor: crosshair;
       }
 
-      .loading {
+      body {
+        margin: 0;
+        overflow: hidden;
+        background:
+          linear-gradient(rgba(85, 215, 230, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(85, 215, 230, 0.04) 1px, transparent 1px),
+          var(--bg);
+        background-size:
+          44px 44px,
+          44px 44px,
+          auto;
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      .app-shell {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        min-width: 320px;
+        background: #04070d;
+      }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        background: #03060d;
+      }
+
+      .stage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(9, 10, 15, 0.7), transparent 24%, transparent 76%, rgba(9, 10, 15, 0.64)),
+          linear-gradient(180deg, rgba(9, 10, 15, 0.72), transparent 16%, transparent 82%, rgba(9, 10, 15, 0.82));
+      }
+
+      #canvas {
         position: absolute;
         top: 50%;
         left: 50%;
+        width: max(100vw, 125vh);
+        height: max(100vh, 80vw);
         transform: translate(-50%, -50%);
+        display: block;
+        background: #050914;
+      }
+
+      .control-panel {
+        position: fixed;
+        top: 18px;
+        left: 18px;
+        z-index: 5;
+        width: min(390px, calc(100vw - 36px));
+        max-height: calc(100vh - 36px);
+        display: grid;
+        grid-template-rows: auto auto auto 1fr;
+        gap: 14px;
+        padding: 16px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background:
+          radial-gradient(circle at 18% 0%, rgba(85, 215, 230, 0.12), transparent 34%),
+          linear-gradient(180deg, rgba(247, 239, 213, 0.085), transparent 150px),
+          var(--panel);
+        background-clip: padding-box;
+        box-shadow: var(--shadow);
+        -webkit-backdrop-filter: blur(18px) saturate(1.2);
+        backdrop-filter: blur(18px) saturate(1.2);
+        transition:
+          transform 180ms ease,
+          opacity 180ms ease;
+      }
+
+      body[data-panel="closed"] .control-panel {
+        transform: translateX(calc(-100% - 28px));
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .panel-reveal {
+        position: fixed;
+        top: 18px;
+        left: 18px;
+        z-index: 6;
+        min-width: 46px;
+        height: 42px;
+        padding: 0 14px;
+        border: 1px solid rgba(85, 215, 230, 0.48);
+        border-radius: 8px;
+        background: var(--panel-strong);
+        color: var(--text);
+        box-shadow: var(--shadow);
+        -webkit-backdrop-filter: blur(16px) saturate(1.2);
+        backdrop-filter: blur(16px) saturate(1.2);
+      }
+
+      .brand-row {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .eyebrow {
+        margin: 0 0 5px;
+        color: var(--gold);
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--text);
+        font-size: clamp(1.55rem, 5vw, 2.35rem);
+        line-height: 0.95;
+        letter-spacing: 0;
+        text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 0.95rem;
+        line-height: 1.35;
+      }
+
+      .panel-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+      }
+
+      button {
+        min-height: 38px;
+        padding: 0 13px;
+        border: 1px solid rgba(85, 215, 230, 0.46);
+        border-radius: 6px;
+        background: rgba(4, 9, 15, 0.54);
+        color: var(--text);
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        transition:
+          background 150ms ease,
+          border-color 150ms ease,
+          color 150ms ease,
+          transform 150ms ease;
+      }
+
+      button:hover:not(:disabled) {
+        border-color: var(--cyan);
+        background: rgba(85, 215, 230, 0.18);
+        color: #ffffff;
+      }
+
+      button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+
+      button:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
+      }
+
+      button:disabled {
+        opacity: 0.42;
+        cursor: not-allowed;
+      }
+
+      .primary-action {
+        border-color: rgba(185, 135, 79, 0.64);
+        background: linear-gradient(145deg, rgba(185, 135, 79, 0.22), rgba(85, 215, 230, 0.11));
+      }
+
+      .hide-button {
+        min-width: 52px;
+        padding: 0 10px;
         text-align: center;
-        z-index: 1000;
-        background: rgba(26, 26, 46, 0.9);
-        backdrop-filter: blur(10px);
-        padding: 40px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
       }
 
-      .spinner {
-        border: 4px solid rgba(255, 255, 255, 0.1);
-        border-left: 4px solid #4ecdc4;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 20px;
+      .status {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--cyan);
+        border-radius: 6px;
+        background: rgba(6, 14, 18, 0.44);
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.35;
       }
 
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
+      .status.success {
+        border-left-color: var(--green);
+        color: #d9ffe4;
       }
 
-      .hidden {
-        display: none;
+      .status.error {
+        border-left-color: var(--red);
+        color: #ffd7d7;
       }
 
-      /* Click effect animation */
-      @keyframes clickEffect {
-        0% {
-          transform: scale(0);
-          opacity: 1;
+      .loading {
+        color: var(--muted);
+      }
+
+      .metrics {
+        min-height: 0;
+        overflow: auto;
+        padding-right: 2px;
+        scrollbar-color: rgba(85, 215, 230, 0.45) transparent;
+      }
+
+      .metric-section {
+        margin-bottom: 14px;
+      }
+
+      .section-label {
+        margin: 0 0 8px;
+        color: var(--faint);
+        font-size: 0.64rem;
+        font-weight: 900;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .stat-card {
+        min-width: 0;
+        min-height: 68px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background:
+          linear-gradient(135deg, rgba(247, 239, 213, 0.055), transparent 78%),
+          rgba(6, 10, 15, 0.34);
+        box-shadow: inset 0 1px 0 rgba(247, 239, 213, 0.08);
+      }
+
+      .stat-label {
+        overflow: hidden;
+        color: var(--faint);
+        font-size: 0.64rem;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .stat-value {
+        margin-top: 7px;
+        color: var(--cyan);
+        font-variant-numeric: tabular-nums;
+        font-size: clamp(1.25rem, 4vw, 1.7rem);
+        font-weight: 900;
+        line-height: 1;
+        text-shadow: 0 3px 18px rgba(0, 0, 0, 0.42);
+      }
+
+      .stat-card[data-tone="gold"] .stat-value {
+        color: #e7b77d;
+      }
+
+      .stat-card[data-tone="green"] .stat-value {
+        color: var(--green);
+      }
+
+      .stat-card[data-tone="red"] .stat-value {
+        color: #ff8d8d;
+      }
+
+      .control-stack {
+        display: grid;
+        gap: 10px;
+        padding: 2px 0 4px;
+      }
+
+      .control-row {
+        display: grid;
+        gap: 6px;
+      }
+
+      .control-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .control-name,
+      .control-output {
+        overflow: hidden;
+        font-size: 0.64rem;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .control-name {
+        color: var(--faint);
+      }
+
+      .control-output {
+        color: var(--cyan);
+        font-variant-numeric: tabular-nums;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        height: 18px;
+        margin: 0;
+        accent-color: var(--cyan);
+        cursor: pointer;
+      }
+
+      .stat-value-small {
+        font-size: clamp(0.95rem, 3vw, 1.2rem);
+        line-height: 1.1;
+      }
+
+      .screen-plate {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 12px;
+        border: 1px solid rgba(247, 239, 213, 0.12);
+        border-radius: 8px;
+        background: rgba(10, 14, 22, 0.62);
+        box-shadow: 0 14px 50px rgba(0, 0, 0, 0.35);
+        color: var(--muted);
+        backdrop-filter: blur(14px);
+      }
+
+      .screen-plate strong {
+        color: var(--text);
+        font-size: 0.75rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 18px rgba(101, 212, 136, 0.8);
+      }
+
+      body:not([data-running="true"]) .pulse-dot {
+        background: var(--gold);
+        box-shadow: 0 0 18px rgba(185, 135, 79, 0.7);
+      }
+
+      @media (max-width: 720px) {
+        .control-panel {
+          top: auto;
+          right: 10px;
+          bottom: 10px;
+          left: 10px;
+          width: auto;
+          max-height: min(68vh, 620px);
+          padding: 12px;
         }
-        50% {
-          transform: scale(1.5);
-          opacity: 0.7;
+
+        body[data-panel="closed"] .control-panel {
+          transform: translateY(calc(100% + 20px));
         }
-        100% {
-          transform: scale(2);
-          opacity: 0;
+
+        .panel-reveal {
+          top: auto;
+          bottom: 14px;
+          left: 14px;
+        }
+
+        .screen-plate {
+          right: 10px;
+          bottom: 10px;
+          padding: 8px 10px;
+        }
+
+        body[data-panel="open"] .screen-plate {
+          display: none;
+        }
+
+        .panel-actions {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .panel-actions button {
+          width: 100%;
+        }
+
+        .brand-row {
+          align-items: center;
+        }
+
+        .subtitle {
+          display: none;
         }
       }
     </style>
   </head>
-  <body>
-    <div class="container">
-      <div class="stats-overlay" id="stats-overlay">
-        <div class="stats-header">
-          <div class="stats-title">
-            <span class="status-indicator"></span>
-          </div>
+  <body data-panel="open" data-running="false">
+    <div class="app-shell">
+      <main class="stage" id="stage">
+        <canvas id="canvas" width="1000" height="800"></canvas>
+      </main>
+
+      <button id="showPanelBtn" class="panel-reveal" type="button" hidden>
+        Panel
+      </button>
+
+      <aside id="controlPanel" class="control-panel" aria-label="Simulation controls">
+        <div class="brand-row">
           <div>
-            <button
-              class="restart-btn"
-              id="restart-btn"
-              title="Restart simulation"
-            >
-              ↻ Restart
-            </button>
-            <button class="minimize-btn" id="minimize-btn" title="Hide stats">
-              ×
-            </button>
+            <p class="eyebrow">Total Reality Engineering</p>
+            <h1>evo-1</h1>
+            <p class="subtitle">Selection-field ecology sandbox</p>
           </div>
+          <button
+            id="hidePanelBtn"
+            class="hide-button"
+            type="button"
+            aria-label="Hide control panel"
+            title="Hide control panel"
+          >
+            Hide
+          </button>
         </div>
-        <div class="stats-content">
-          <div class="stats-grid">
-            <div class="stat-item">
-              <div class="label">Agents</div>
-              <div id="agent-count" class="value">0</div>
-            </div>
-            <div class="stat-item">
-              <div class="label">Resources</div>
-              <div id="resource-count" class="value">0</div>
-            </div>
-            <div class="stat-item">
-              <div class="label">Generation</div>
-              <div id="max-generation" class="value">0</div>
-            </div>
-            <div class="stat-item">
-              <div class="label">Avg Age</div>
-              <div id="avg-age" class="value">0</div>
-            </div>
-            <div class="stat-item">
-              <div class="label">Total Energy</div>
-              <div id="total-energy" class="value">0</div>
-            </div>
-            <div class="stat-item">
-              <div class="label">Total Kills</div>
-              <div id="total-kills" class="value">0</div>
-            </div>
-            <div class="stat-item full-width">
-              <div class="label">Avg Fitness</div>
-              <div id="avg-fitness" class="value">0</div>
-            </div>
-          </div>
+
+        <div id="status" class="status" aria-live="polite">
+          <div class="loading">Loading simulation...</div>
         </div>
-      </div>
 
-      <div class="stats-toggle" id="stats-toggle" title="Show stats">⚡</div>
+        <div class="panel-actions">
+          <button id="resetBtn" class="primary-action" type="button" disabled>
+            Reset Simulation
+          </button>
+        </div>
 
-      <div id="loading" class="loading">
-        <div class="spinner"></div>
-        <p>Initializing simulation...</p>
+        <div class="metrics">
+          <section class="metric-section">
+            <p class="section-label">Motion</p>
+            <div class="control-stack">
+              <label class="control-row" for="motionSmoothness">
+                <span class="control-heading">
+                  <span class="control-name">Smoothness</span>
+                  <output class="control-output" id="motionSmoothnessValue">50%</output>
+                </span>
+                <input
+                  id="motionSmoothness"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="50"
+                />
+              </label>
+              <label class="control-row" for="motionSpeed">
+                <span class="control-heading">
+                  <span class="control-name">Speed</span>
+                  <output class="control-output" id="motionSpeedValue">100%</output>
+                </span>
+                <input
+                  id="motionSpeed"
+                  type="range"
+                  min="25"
+                  max="240"
+                  step="1"
+                  value="100"
+                />
+              </label>
+              <label class="control-row" for="motionWander">
+                <span class="control-heading">
+                  <span class="control-name">Restlessness</span>
+                  <output class="control-output" id="motionWanderValue">35%</output>
+                </span>
+                <input
+                  id="motionWander"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="35"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Ecology</p>
+            <div class="control-stack">
+              <label class="control-row" for="foodGrowth">
+                <span class="control-heading">
+                  <span class="control-name">Food Growth</span>
+                  <output class="control-output" id="foodGrowthValue">100%</output>
+                </span>
+                <input
+                  id="foodGrowth"
+                  type="range"
+                  min="25"
+                  max="250"
+                  step="1"
+                  value="100"
+                />
+              </label>
+              <label class="control-row" for="birthRate">
+                <span class="control-heading">
+                  <span class="control-name">Birth Rate</span>
+                  <output class="control-output" id="birthRateValue">100%</output>
+                </span>
+                <input
+                  id="birthRate"
+                  type="range"
+                  min="25"
+                  max="250"
+                  step="1"
+                  value="100"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Population</p>
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-label">Agents</div>
+                <div class="stat-value" id="agentCount">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Resources</div>
+                <div class="stat-value" id="resourceCount">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Energy</div>
+                <div class="stat-value" id="totalEnergy">0</div>
+              </div>
+              <div class="stat-card" data-tone="gold">
+                <div class="stat-label">Generation</div>
+                <div class="stat-value" id="maxGen">0</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Ecology</p>
+            <div class="stats">
+              <div class="stat-card" data-tone="red">
+                <div class="stat-label">Kills</div>
+                <div class="stat-value" id="totalKills">0</div>
+              </div>
+              <div class="stat-card" data-tone="green">
+                <div class="stat-label">Births</div>
+                <div class="stat-value" id="totalBirths">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Predators</div>
+                <div class="stat-value" id="predatorAgents">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Prey</div>
+                <div class="stat-value" id="preyAgents">0</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Behavior</p>
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-label">Feeding</div>
+                <div class="stat-value" id="feedingAgents">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Hunting</div>
+                <div class="stat-value" id="huntingAgents">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Fleeing</div>
+                <div class="stat-value" id="fleeingAgents">0</div>
+              </div>
+              <div class="stat-card" data-tone="red">
+                <div class="stat-label">Fighting</div>
+                <div class="stat-value" id="fightingAgents">0</div>
+              </div>
+              <div class="stat-card" data-tone="gold">
+                <div class="stat-label">Reproducing</div>
+                <div class="stat-value" id="reproducingAgents">0</div>
+              </div>
+              <div class="stat-card" data-tone="green">
+                <div class="stat-label">Ready to Mate</div>
+                <div class="stat-value" id="reproductionCandidates">0</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="metric-section">
+            <p class="section-label">Runtime</p>
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-label">Average Age</div>
+                <div class="stat-value" id="avgAge">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">FPS</div>
+                <div class="stat-value" id="fps">0</div>
+              </div>
+              <div class="stat-card" data-tone="gold">
+                <div class="stat-label">Renderer</div>
+                <div class="stat-value stat-value-small" id="renderingMode">
+                  -
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">CPU Workers</div>
+                <div class="stat-value stat-value-small" id="workerStatus">
+                  -
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </aside>
+
+      <div class="screen-plate" aria-hidden="true">
+        <span class="pulse-dot"></span>
+        <strong>Live Ecology</strong>
       </div>
-      <canvas id="simulation-canvas" class="hidden"></canvas>
     </div>
 
     <script src="sentry-config.js"></script>
     <script src="sentry.js" defer></script>
     <script type="module">
       import init, {
-        BattleSimulation,
+        createEvoOneSimulation,
         ParallelProcessor,
-      } from "./pkg/battleo.js";
+      } from "./pkg/evo_1.js";
 
-      let simulation;
-      let parallelProcessor;
+      let simulation = null;
+      let processor = null;
       let isRunning = false;
+      let parallelInitialized = false;
+      let frameCount = 0;
+      let lastTime = performance.now();
 
-      async function main() {
-        try {
-          await init();
+      const statusDiv = document.getElementById("status");
+      const resetBtn = document.getElementById("resetBtn");
+      const hidePanelBtn = document.getElementById("hidePanelBtn");
+      const showPanelBtn = document.getElementById("showPanelBtn");
+      const controlPanel = document.getElementById("controlPanel");
+      const motionSmoothness = document.getElementById("motionSmoothness");
+      const motionSmoothnessValue = document.getElementById(
+        "motionSmoothnessValue",
+      );
+      const motionSpeed = document.getElementById("motionSpeed");
+      const motionSpeedValue = document.getElementById("motionSpeedValue");
+      const motionWander = document.getElementById("motionWander");
+      const motionWanderValue = document.getElementById("motionWanderValue");
+      const foodGrowth = document.getElementById("foodGrowth");
+      const foodGrowthValue = document.getElementById("foodGrowthValue");
+      const birthRate = document.getElementById("birthRate");
+      const birthRateValue = document.getElementById("birthRateValue");
 
-          // Initialize parallel processor with Rayon by default
-          parallelProcessor = new ParallelProcessor();
-
-          // Try to initialize Rayon first
-          try {
-            await parallelProcessor.initialize();
-            console.log("Rayon parallel processing initialized successfully");
-          } catch (error) {
-            console.log("Rayon initialization failed, using fallback mode");
-            await parallelProcessor.initialize_fallback();
-          }
-
-          simulation = new BattleSimulation("simulation-canvas");
-          simulation.set_rayon_initialized(true);
-
-          // Hide loading, show canvas
-          document.getElementById("loading").classList.add("hidden");
-          document
-            .getElementById("simulation-canvas")
-            .classList.remove("hidden");
-
-          setupEventListeners();
-          startStatsUpdate();
-
-          // Auto-start the simulation
-          simulation.start();
-          isRunning = true;
-          animate();
-        } catch (error) {
-          console.error("Failed to initialize simulation:", error);
-          document.getElementById("loading").innerHTML = `
-            <div style="color: #ff6b6b;">
-              <h3>Failed to load simulation</h3>
-              <p>${error.message}</p>
-              <p>Make sure to build the project with: wasm-pack build --target web</p>
-            </div>
-          `;
-        }
+      function updateStatus(message, type = "info") {
+        statusDiv.className = `status ${type}`;
+        statusDiv.textContent = message;
       }
 
-      function setupEventListeners() {
-        // Restart button
-        document.getElementById("restart-btn").addEventListener("click", () => {
-          if (simulation) {
-            simulation.reset();
-            updateStats();
-          }
-        });
-
-        // Hide stats button
-        document
-          .getElementById("minimize-btn")
-          .addEventListener("click", () => {
-            const overlay = document.getElementById("stats-overlay");
-            const toggle = document.getElementById("stats-toggle");
-
-            overlay.classList.remove("visible");
-            toggle.style.display = "flex";
-          });
-
-        // Show stats toggle
-        document
-          .getElementById("stats-toggle")
-          .addEventListener("click", () => {
-            const overlay = document.getElementById("stats-overlay");
-            const toggle = document.getElementById("stats-toggle");
-
-            overlay.classList.add("visible");
-            toggle.style.display = "none";
-          });
-
-        // Canvas click handling - add agents by default
-        const canvas = document.getElementById("simulation-canvas");
-        canvas.addEventListener("click", (event) => {
-          const rect = canvas.getBoundingClientRect();
-          const x = event.clientX - rect.left;
-          const y = event.clientY - rect.top;
-
-          // Add visual feedback
-          createClickEffect(event.clientX, event.clientY);
-
-          // Add agent at click location
-          simulation.add_agent(x, y);
-        });
+      function setPanelOpen(open) {
+        document.body.dataset.panel = open ? "open" : "closed";
+        controlPanel.setAttribute("aria-hidden", open ? "false" : "true");
+        showPanelBtn.hidden = open;
       }
 
-      function createClickEffect(x, y) {
-        const effect = document.createElement("div");
-        effect.style.position = "fixed";
-        effect.style.left = x - 10 + "px";
-        effect.style.top = y - 10 + "px";
-        effect.style.width = "20px";
-        effect.style.height = "20px";
-        effect.style.borderRadius = "50%";
-        effect.style.background =
-          "radial-gradient(circle, rgba(78, 205, 196, 0.8) 0%, transparent 70%)";
-        effect.style.pointerEvents = "none";
-        effect.style.zIndex = "1000";
-        effect.style.animation = "clickEffect 0.6s ease-out forwards";
-
-        document.body.appendChild(effect);
-
-        setTimeout(() => {
-          document.body.removeChild(effect);
-        }, 600);
+      function updateRunningState(running) {
+        document.body.dataset.running = running ? "true" : "false";
       }
 
-      function updateStats() {
+      function updateWorkerStatus(status) {
+        document.getElementById("workerStatus").textContent = status;
+      }
+
+      function updateMotionLabels() {
+        motionSmoothnessValue.textContent = `${motionSmoothness.value}%`;
+        motionSpeedValue.textContent = `${motionSpeed.value}%`;
+        motionWanderValue.textContent = `${motionWander.value}%`;
+      }
+
+      function updateEcologyLabels() {
+        foodGrowthValue.textContent = `${foodGrowth.value}%`;
+        birthRateValue.textContent = `${birthRate.value}%`;
+      }
+
+      function applyMotionControls() {
+        updateMotionLabels();
         if (!simulation) return;
 
-        const stats = simulation.get_stats();
-
-        document.getElementById("agent-count").textContent = stats.agent_count;
-        document.getElementById("resource-count").textContent =
-          stats.resource_count;
-        document.getElementById("max-generation").textContent =
-          stats.max_generation;
-        document.getElementById("avg-age").textContent = Math.round(
-          stats.average_age
+        simulation.set_motion_controls(
+          Number(motionSmoothness.value) / 100,
+          Number(motionSpeed.value) / 100,
+          Number(motionWander.value) / 100,
         );
-        document.getElementById("total-energy").textContent = Math.round(
-          stats.total_energy
-        );
-        document.getElementById("total-kills").textContent = stats.total_kills;
-        document.getElementById("avg-fitness").textContent =
-          stats.average_fitness.toFixed(2);
       }
 
-      function startStatsUpdate() {
-        setInterval(updateStats, 1000); // Update stats every second
+      function applyEcologyControls() {
+        updateEcologyLabels();
+        if (!simulation) return;
+
+        simulation.set_ecology_controls(
+          Number(foodGrowth.value) / 100,
+          Number(birthRate.value) / 100,
+        );
+      }
+
+      function updateStats(stats) {
+        const setText = (id, value) => {
+          document.getElementById(id).textContent = value;
+        };
+        const count = (value) => value ?? 0;
+
+        setText("agentCount", count(stats.agent_count));
+        setText("resourceCount", count(stats.resource_count));
+        setText("totalEnergy", Math.round(count(stats.total_energy)));
+        setText("avgAge", Math.round(count(stats.average_age)));
+        setText("maxGen", count(stats.max_generation));
+        setText("totalKills", count(stats.total_kills));
+        setText("totalBirths", count(stats.total_birth_events));
+        setText("predatorAgents", count(stats.predator_agents));
+        setText("preyAgents", count(stats.prey_agents));
+        setText("feedingAgents", count(stats.feeding_agents));
+        setText("huntingAgents", count(stats.hunting_agents));
+        setText("fleeingAgents", count(stats.fleeing_agents));
+        setText("fightingAgents", count(stats.fighting_agents));
+        setText("reproducingAgents", count(stats.reproducing_agents));
+        setText("reproductionCandidates", count(stats.reproduction_candidates));
+      }
+
+      function updateFPS() {
+        const currentTime = performance.now();
+        const deltaTime = currentTime - lastTime;
+
+        if (deltaTime >= 1000) {
+          const fps = Math.round((frameCount * 1000) / deltaTime);
+          document.getElementById("fps").textContent = fps;
+          frameCount = 0;
+          lastTime = currentTime;
+        }
+        frameCount++;
       }
 
       function animate() {
-        if (isRunning && simulation) {
-          simulation.animate();
-          requestAnimationFrame(animate);
+        if (!simulation || !isRunning) return;
+
+        simulation.update();
+        updateStats(simulation.get_stats());
+        updateFPS();
+
+        requestAnimationFrame(animate);
+      }
+
+      function startSimulation() {
+        if (!simulation || isRunning) return;
+
+        isRunning = true;
+        updateRunningState(true);
+        animate();
+        updateStatus("Simulation running", "success");
+      }
+
+      function resetSimulation() {
+        if (!simulation) return;
+
+        simulation.reset();
+        applyMotionControls();
+        applyEcologyControls();
+        updateStats(simulation.get_stats());
+        updateStatus("Simulation reset", "info");
+        if (!isRunning) {
+          startSimulation();
         }
       }
 
-      // Initialize the application
+      async function initializeWorkerThreads() {
+        if (!processor || parallelInitialized) return;
+
+        try {
+          updateWorkerStatus("Starting");
+          await processor.initialize();
+
+          if (processor.is_rayon_available()) {
+            parallelInitialized = true;
+            simulation?.set_parallel_resources_enabled(true);
+            updateWorkerStatus("On");
+          } else {
+            simulation?.set_parallel_resources_enabled(false);
+            updateWorkerStatus("Off");
+          }
+        } catch (error) {
+          simulation?.set_parallel_resources_enabled(false);
+          updateWorkerStatus("Off");
+          console.warn("CPU worker initialization failed:", error);
+        }
+      }
+
+      resetBtn.addEventListener("click", resetSimulation);
+      hidePanelBtn.addEventListener("click", () => setPanelOpen(false));
+      showPanelBtn.addEventListener("click", () => setPanelOpen(true));
+      [motionSmoothness, motionSpeed, motionWander].forEach((control) => {
+        control.addEventListener("input", applyMotionControls);
+      });
+      [foodGrowth, birthRate].forEach((control) => {
+        control.addEventListener("input", applyEcologyControls);
+      });
+
+      updateMotionLabels();
+      updateEcologyLabels();
+
+      async function main() {
+        try {
+          updateStatus("Loading WebAssembly module", "info");
+          await init();
+
+          updateStatus("Preparing runtime", "info");
+          processor = new ParallelProcessor();
+          updateWorkerStatus("Starting");
+
+          updateStatus("Creating simulation", "info");
+          simulation = await createEvoOneSimulation("canvas");
+          applyMotionControls();
+          applyEcologyControls();
+
+          const renderingMode = simulation.get_rendering_mode();
+          console.log(`Rendering mode: ${renderingMode}`);
+          document.getElementById("renderingMode").textContent = renderingMode;
+          updateStatus(`${renderingMode} active`, "success");
+
+          updateStats(simulation.get_stats());
+
+          resetBtn.disabled = false;
+          startSimulation();
+          void initializeWorkerThreads();
+        } catch (error) {
+          updateStatus(`Initialization failed: ${error}`, "error");
+          console.error("Initialization error:", error);
+        }
+      }
+
       main();
     </script>
   </body>

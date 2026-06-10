@@ -1,0 +1,146 @@
+digraph EvoOneSystemOverview {
+  graph [
+    rankdir=TB,
+    bgcolor="#ffffff",
+    pad="0.55",
+    nodesep="0.55",
+    ranksep="0.85",
+    splines=polyline,
+    outputorder=edgesfirst,
+    compound=true,
+    newrank=true,
+    forcelabels=true,
+    fontname="Avenir",
+    label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
+        <TR><TD><FONT POINT-SIZE="34"><B>evo-1 System Overview</B></FONT></TD></TR>
+      </TABLE>
+    >,
+    labelloc=t,
+    labeljust=c
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    margin="0.21,0.13",
+    width=2.90,
+    height=0.72,
+    fixedsize=false,
+    fontname="Avenir",
+    fontsize=18,
+    penwidth=2.4,
+    fontcolor="#14213d",
+    color="#2264c7",
+    fillcolor="#eaf3ff:#ffffff",
+    gradientangle=270
+  ];
+
+  edge [
+    color="#263a59",
+    fontname="Avenir",
+    fontsize=13,
+    fontcolor="#3d4a5c",
+    penwidth=2.2,
+    arrowsize=0.78
+  ];
+
+  browser [label=<<B>Browser</B><BR/><FONT POINT-SIZE="15">index.html + wasm package</FONT>>];
+  cli [label=<<B>Native CLI</B><BR/><FONT POINT-SIZE="15">scripts and src/bin/headless.rs</FONT>>];
+
+  subgraph cluster_adapters {
+    graph [
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" COLOR="#1f5fbf"><B>BOUNDARY ADAPTERS</B></FONT></TD></TR>
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12" COLOR="#496f9f">Adapters translate platform concerns into Simulation calls.</FONT></TD></TR>
+        </TABLE>
+      >,
+      labelloc=t,
+      labeljust=l,
+      color="#b9d8ff",
+      fillcolor="#f5faff",
+      style="rounded,filled",
+      penwidth=1.8,
+      margin=22
+    ];
+
+    wasm_adapter [label=<<B>EvoOneSimulation</B><BR/><FONT POINT-SIZE="15">WASM API in src/lib.rs</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
+    parallel_adapter [label=<<B>ParallelProcessor</B><BR/><FONT POINT-SIZE="15">thread-pool readiness</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    headless_adapter [label=<<B>HeadlessSimulation</B><BR/><FONT POINT-SIZE="15">native experiment runner</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
+
+    wasm_adapter -> parallel_adapter [label="optional worker pool", style=dashed, color="#6b7280", fontcolor="#6b7280"];
+  }
+
+  subgraph cluster_core {
+    graph [
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" COLOR="#1e6b43"><B>SIMULATION CORE</B></FONT></TD></TR>
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12" COLOR="#4e7a61">Simulation owns the frame pipeline and protects the ECS boundary.</FONT></TD></TR>
+        </TABLE>
+      >,
+      labelloc=t,
+      labeljust=l,
+      color="#b8e5c8",
+      fillcolor="#f4fbf6",
+      style="rounded,filled",
+      penwidth=1.8,
+      margin=22
+    ];
+
+    simulation [label=<<B>Simulation facade</B><BR/><FONT POINT-SIZE="15">config, time, commands, stats</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    seeded_scenarios [label=<<B>Seeded scenarios</B><BR/><FONT POINT-SIZE="15">reproducible ecology probes</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    capabilities [label=<<B>RuntimeCapabilities</B><BR/><FONT POINT-SIZE="15">explicit parallel resource flag</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    world [label=<<B>EcsWorld</B><BR/><FONT POINT-SIZE="15">hecs::World + systems</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    components [label=<<B>ECS components</B><BR/><FONT POINT-SIZE="15">Position, Energy, Genes, AgentState, tags</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    spatial_grid [label=<<B>SpatialGrid</B><BR/><FONT POINT-SIZE="15">nearby entity lookup</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    events [label=<<B>FrameEvent ledger</B><BR/><FONT POINT-SIZE="15">consumed, killed, died, born</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    frame_pipeline [label=<<B>Ordered frame pipeline</B><BR/><FONT POINT-SIZE="15">resources, decisions, lifecycle</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+
+    simulation -> world [label="owns"];
+    simulation -> seeded_scenarios [label="configures"];
+    simulation -> capabilities [label="owns"];
+    world -> components [label="stores"];
+    world -> spatial_grid [label="rebuilds each frame"];
+    world -> events [label="records lifecycle facts"];
+    simulation -> frame_pipeline [label="runs update()"];
+    frame_pipeline -> world [label="mutates ECS"];
+  }
+
+  subgraph cluster_outputs {
+    graph [
+      label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="17" COLOR="#0f766e"><B>READ MODELS AND OUTPUTS</B></FONT></TD></TR>
+          <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12" COLOR="#357a74">Outputs read snapshots; they do not own simulation rules.</FONT></TD></TR>
+        </TABLE>
+      >,
+      labelloc=t,
+      labeljust=l,
+      color="#99d5cf",
+      fillcolor="#f0fdfa",
+      style="rounded,filled",
+      penwidth=1.8,
+      margin=22
+    ];
+
+    renderer [label=<<B>WebRenderer</B><BR/><FONT POINT-SIZE="15">WebGPU first, WebGL/Canvas2D fallback</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
+    stats [label=<<B>SimulationStats</B><BR/><FONT POINT-SIZE="15">counts, behavior, events</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
+    diagnostics [label=<<B>SimulationDiagnostics</B><BR/><FONT POINT-SIZE="15">headless experiment summary</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
+    dto [label=<<B>Snapshot DTOs</B><BR/><FONT POINT-SIZE="15">Agent and Resource read models</FONT>>, fillcolor="#f5f3ff:#ffffff", color="#7c3aed"];
+  }
+
+  browser -> wasm_adapter [label="update, reset, add, stats"];
+  browser -> renderer [label="draws canvas", style=dashed, color="#6b7280", fontcolor="#6b7280"];
+  cli -> headless_adapter [label="configures run"];
+
+  wasm_adapter -> simulation [lhead=cluster_core, label="delegates"];
+  headless_adapter -> simulation [lhead=cluster_core, label="delegates"];
+  parallel_adapter -> capabilities [lhead=cluster_core, label="enables after init"];
+
+  simulation -> renderer [ltail=cluster_core, lhead=cluster_outputs, label="render snapshot"];
+  simulation -> stats [ltail=cluster_core, lhead=cluster_outputs, label="get_stats"];
+  simulation -> diagnostics [ltail=cluster_core, lhead=cluster_outputs, label="headless run"];
+  simulation -> dto [ltail=cluster_core, lhead=cluster_outputs, label="get_agents / get_resources"];
+}
