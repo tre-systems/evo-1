@@ -14,7 +14,9 @@ mkdir -p "${DIST_DIR}/pkg"
 sed \
   "s#\"./pkg/evo_1.js\"#\"./pkg/evo_1.js?v=${BUILD_VERSION}\"#" \
   "${ROOT_DIR}/index.html" > "${DIST_DIR}/index.html"
+node "${ROOT_DIR}/scripts/write-sentry-config.mjs" evo-1 "${DIST_DIR}/sentry-config.js" "${BUILD_VERSION}"
 cp "${ROOT_DIR}/LICENSE" "${DIST_DIR}/LICENSE"
+cp "${ROOT_DIR}/sentry.js" "${DIST_DIR}/sentry.js"
 cp -R "${ROOT_DIR}/pkg/." "${DIST_DIR}/pkg/"
 cp "${ROOT_DIR}/public/_headers" "${DIST_DIR}/_headers"
 

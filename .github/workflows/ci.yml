@@ -71,8 +71,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' &&
-        (github.ref == 'refs/heads/main' ||
-         github.ref == 'refs/heads/feature/parallel-evolution-refactor'))
+        github.ref == 'refs/heads/main')
     permissions:
       contents: read
 
@@ -93,6 +92,10 @@ jobs:
 
       - name: Build Cloudflare Pages bundle
         run: ./scripts/build-pages.sh
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: production
+          SENTRY_RELEASE: ${{ github.sha }}
 
       - name: Deploy to Cloudflare Pages
         run: npx --yes wrangler pages deploy dist --project-name=evo-1 --branch=main
