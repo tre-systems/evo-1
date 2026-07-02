@@ -192,13 +192,13 @@ digraph EvoOneRuntimeModel {
     >];
   }
 
-  headless_config -> simulation_config [label="maps counts into"];
-  simulation_config -> simulation [label="constructs / resets"];
-  runtime_capabilities -> simulation [label="enables runtime features"];
-  simulation -> ecs_world [lhead=cluster_simulation, label="owns"];
-  ecs_world -> agent_entity [ltail=cluster_simulation, lhead=cluster_entities, label="spawns and mutates"];
-  ecs_world -> resource_entity [ltail=cluster_simulation, lhead=cluster_entities, label="spawns and mutates"];
-  simulation -> stats [ltail=cluster_simulation, lhead=cluster_outputs, label="aggregates"];
-  simulation -> snapshot_dtos [ltail=cluster_simulation, lhead=cluster_outputs, label="converts snapshots"];
-  stats -> diagnostics [ltail=cluster_outputs, label="included in headless run"];
+  headless_config -> simulation_config [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">maps counts into</FONT></TD></TR></TABLE>>];
+  simulation_config -> simulation [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">constructs / resets</FONT></TD></TR></TABLE>>];
+  runtime_capabilities -> simulation [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">enables runtime features</FONT></TD></TR></TABLE>>];
+  simulation -> ecs_world [lhead=cluster_simulation, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">owns</FONT></TD></TR></TABLE>>];
+  ecs_world -> agent_entity [ltail=cluster_simulation, lhead=cluster_entities, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">spawns and mutates</FONT></TD></TR></TABLE>>];
+  ecs_world -> resource_entity [ltail=cluster_simulation, lhead=cluster_entities, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">spawns and mutates</FONT></TD></TR></TABLE>>];
+  simulation -> stats [ltail=cluster_simulation, lhead=cluster_outputs, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">aggregates</FONT></TD></TR></TABLE>>];
+  simulation -> snapshot_dtos [ltail=cluster_simulation, lhead=cluster_outputs, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">converts snapshots</FONT></TD></TR></TABLE>>];
+  stats -> diagnostics [ltail=cluster_outputs, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">included in headless run</FONT></TD></TR></TABLE>>];
 }

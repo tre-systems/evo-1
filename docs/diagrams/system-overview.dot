@@ -45,8 +45,8 @@ digraph EvoOneSystemOverview {
     arrowsize=0.78
   ];
 
-  browser [label=<<B>Browser</B><BR/><FONT POINT-SIZE="15">index.html + wasm package</FONT>>];
-  cli [label=<<B>Native CLI</B><BR/><FONT POINT-SIZE="15">scripts and src/bin/headless.rs</FONT>>];
+  browser [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>Browser</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">index.html + wasm package</FONT></TD></TR></TABLE>>];
+  cli [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>Native CLI</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">scripts and src/bin/headless.rs</FONT></TD></TR></TABLE>>];
 
   subgraph cluster_adapters {
     graph [
@@ -65,11 +65,11 @@ digraph EvoOneSystemOverview {
       margin=22
     ];
 
-    wasm_adapter [label=<<B>EvoOneSimulation</B><BR/><FONT POINT-SIZE="15">WASM API in src/lib.rs</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
-    parallel_adapter [label=<<B>ParallelProcessor</B><BR/><FONT POINT-SIZE="15">thread-pool readiness</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
-    headless_adapter [label=<<B>HeadlessSimulation</B><BR/><FONT POINT-SIZE="15">native experiment runner</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
+    wasm_adapter [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>EvoOneSimulation</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">WASM API in src/lib.rs</FONT></TD></TR></TABLE>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
+    parallel_adapter [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>ParallelProcessor</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">thread-pool readiness</FONT></TD></TR></TABLE>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    headless_adapter [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>HeadlessSimulation</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">native experiment runner</FONT></TD></TR></TABLE>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
 
-    wasm_adapter -> parallel_adapter [label="optional worker pool", style=dashed, color="#6b7280", fontcolor="#6b7280"];
+    wasm_adapter -> parallel_adapter [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#dfe3e9" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#6b7280">optional worker pool</FONT></TD></TR></TABLE>>, style=dashed, color="#6b7280", fontcolor="#6b7280"];
   }
 
   subgraph cluster_core {
@@ -89,23 +89,23 @@ digraph EvoOneSystemOverview {
       margin=22
     ];
 
-    simulation [label=<<B>Simulation facade</B><BR/><FONT POINT-SIZE="15">config, time, commands, stats</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    seeded_scenarios [label=<<B>Seeded scenarios</B><BR/><FONT POINT-SIZE="15">reproducible ecology probes</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
-    capabilities [label=<<B>RuntimeCapabilities</B><BR/><FONT POINT-SIZE="15">explicit parallel resource flag</FONT>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
-    world [label=<<B>EcsWorld</B><BR/><FONT POINT-SIZE="15">hecs::World + systems</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    components [label=<<B>ECS components</B><BR/><FONT POINT-SIZE="15">Position, Energy, Genes, AgentState, tags</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    spatial_grid [label=<<B>SpatialGrid</B><BR/><FONT POINT-SIZE="15">nearby entity lookup</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    events [label=<<B>FrameEvent ledger</B><BR/><FONT POINT-SIZE="15">consumed, killed, died, born</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
-    frame_pipeline [label=<<B>Ordered frame pipeline</B><BR/><FONT POINT-SIZE="15">resources, decisions, lifecycle</FONT>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    simulation [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>Simulation facade</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">config, time, commands, stats</FONT></TD></TR></TABLE>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    seeded_scenarios [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>Seeded scenarios</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">reproducible ecology probes</FONT></TD></TR></TABLE>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    capabilities [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>RuntimeCapabilities</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">explicit parallel resource flag</FONT></TD></TR></TABLE>>, fillcolor="#fff4d1:#fffaf0", color="#d39a00"];
+    world [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>EcsWorld</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">hecs::World + systems</FONT></TD></TR></TABLE>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    components [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>ECS components</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">Position, Energy, Genes, AgentState, tags</FONT></TD></TR></TABLE>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    spatial_grid [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>SpatialGrid</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">nearby entity lookup</FONT></TD></TR></TABLE>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    events [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>FrameEvent ledger</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">consumed, killed, died, born</FONT></TD></TR></TABLE>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
+    frame_pipeline [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>Ordered frame pipeline</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">resources, decisions, lifecycle</FONT></TD></TR></TABLE>>, fillcolor="#eaf8ef:#ffffff", color="#22865a"];
 
-    simulation -> world [label="owns"];
-    simulation -> seeded_scenarios [label="configures"];
-    simulation -> capabilities [label="owns"];
-    world -> components [label="stores"];
-    world -> spatial_grid [label="rebuilds each frame"];
-    world -> events [label="records lifecycle facts"];
-    simulation -> frame_pipeline [label="runs update()"];
-    frame_pipeline -> world [label="mutates ECS"];
+    simulation -> world [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">owns</FONT></TD></TR></TABLE>>];
+    simulation -> seeded_scenarios [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">configures</FONT></TD></TR></TABLE>>];
+    simulation -> capabilities [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">owns</FONT></TD></TR></TABLE>>];
+    world -> components [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">stores</FONT></TD></TR></TABLE>>];
+    world -> spatial_grid [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">rebuilds each frame</FONT></TD></TR></TABLE>>];
+    world -> events [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">records lifecycle facts</FONT></TD></TR></TABLE>>];
+    simulation -> frame_pipeline [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">runs update()</FONT></TD></TR></TABLE>>];
+    frame_pipeline -> world [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">mutates ECS</FONT></TD></TR></TABLE>>];
   }
 
   subgraph cluster_outputs {
@@ -125,22 +125,22 @@ digraph EvoOneSystemOverview {
       margin=22
     ];
 
-    renderer [label=<<B>WebRenderer</B><BR/><FONT POINT-SIZE="15">WebGPU first, WebGL/Canvas2D fallback</FONT>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
-    stats [label=<<B>SimulationStats</B><BR/><FONT POINT-SIZE="15">counts, behavior, events</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
-    diagnostics [label=<<B>SimulationDiagnostics</B><BR/><FONT POINT-SIZE="15">headless experiment summary</FONT>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
-    dto [label=<<B>Snapshot DTOs</B><BR/><FONT POINT-SIZE="15">Agent and Resource read models</FONT>>, fillcolor="#f5f3ff:#ffffff", color="#7c3aed"];
+    renderer [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>WebRenderer</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">WebGPU first, WebGL/Canvas2D fallback</FONT></TD></TR></TABLE>>, fillcolor="#edf7ff:#ffffff", color="#2f80ed"];
+    stats [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>SimulationStats</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">counts, behavior, events</FONT></TD></TR></TABLE>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
+    diagnostics [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>SimulationDiagnostics</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">headless experiment summary</FONT></TD></TR></TABLE>>, fillcolor="#e6fffb:#ffffff", color="#0f766e"];
+    dto [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>Snapshot DTOs</B></TD></TR><TR><TD CELLPADDING="4"><FONT POINT-SIZE="15">Agent and Resource read models</FONT></TD></TR></TABLE>>, fillcolor="#f5f3ff:#ffffff", color="#7c3aed"];
   }
 
-  browser -> wasm_adapter [label="update, reset, add, stats"];
-  browser -> renderer [label="draws canvas", style=dashed, color="#6b7280", fontcolor="#6b7280"];
-  cli -> headless_adapter [label="configures run"];
+  browser -> wasm_adapter [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">update, reset, add, stats</FONT></TD></TR></TABLE>>];
+  browser -> renderer [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#dfe3e9" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#6b7280">draws canvas</FONT></TD></TR></TABLE>>, style=dashed, color="#6b7280", fontcolor="#6b7280"];
+  cli -> headless_adapter [label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">configures run</FONT></TD></TR></TABLE>>];
 
-  wasm_adapter -> simulation [lhead=cluster_core, label="delegates"];
-  headless_adapter -> simulation [lhead=cluster_core, label="delegates"];
-  parallel_adapter -> capabilities [lhead=cluster_core, label="enables after init"];
+  wasm_adapter -> simulation [lhead=cluster_core, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">delegates</FONT></TD></TR></TABLE>>];
+  headless_adapter -> simulation [lhead=cluster_core, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">delegates</FONT></TD></TR></TABLE>>];
+  parallel_adapter -> capabilities [lhead=cluster_core, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">enables after init</FONT></TD></TR></TABLE>>];
 
-  simulation -> renderer [ltail=cluster_core, lhead=cluster_outputs, label="render snapshot"];
-  simulation -> stats [ltail=cluster_core, lhead=cluster_outputs, label="get_stats"];
-  simulation -> diagnostics [ltail=cluster_core, lhead=cluster_outputs, label="headless run"];
-  simulation -> dto [ltail=cluster_core, lhead=cluster_outputs, label="get_agents / get_resources"];
+  simulation -> renderer [ltail=cluster_core, lhead=cluster_outputs, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">render snapshot</FONT></TD></TR></TABLE>>];
+  simulation -> stats [ltail=cluster_core, lhead=cluster_outputs, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">get_stats</FONT></TD></TR></TABLE>>];
+  simulation -> diagnostics [ltail=cluster_core, lhead=cluster_outputs, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">headless run</FONT></TD></TR></TABLE>>];
+  simulation -> dto [ltail=cluster_core, lhead=cluster_outputs, label=<<TABLE BORDER="1" CELLBORDER="0" STYLE="ROUNDED" COLOR="#d7dee8" BGCOLOR="#ffffff" CELLSPACING="0" CELLPADDING="4"><TR><TD><FONT POINT-SIZE="13" COLOR="#3d4a5c">get_agents / get_resources</FONT></TD></TR></TABLE>>];
 }
