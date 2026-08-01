@@ -19,5 +19,7 @@ cp "${ROOT_DIR}/LICENSE" "${DIST_DIR}/LICENSE"
 cp "${ROOT_DIR}/sentry.js" "${DIST_DIR}/sentry.js"
 cp -R "${ROOT_DIR}/pkg/." "${DIST_DIR}/pkg/"
 cp "${ROOT_DIR}/public/_headers" "${DIST_DIR}/_headers"
+cp "${ROOT_DIR}/public/robots.txt" "${DIST_DIR}/robots.txt"
+cp "${ROOT_DIR}/public/sitemap.xml" "${DIST_DIR}/sitemap.xml"
 
 echo "Built Cloudflare Pages bundle in ${DIST_DIR} with asset version ${BUILD_VERSION}"
